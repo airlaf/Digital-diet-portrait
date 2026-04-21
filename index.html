@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digital diet portrait</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=IBM+Plex+Mono:wght@400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #0a0a0a;
+        color: #e8e6e3;
+      }
+
+      body {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 48px 24px 64px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .column {
+        width: 100%;
+        max-width: 520px;
+      }
+
+      h1 {
+        font-family: "Cormorant Garamond", serif;
+        font-weight: 300;
+        font-size: clamp(2.25rem, 6vw, 3rem);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 16px;
+        color: #f2f0ec;
+      }
+
+      .subtext {
+        margin: 0 0 40px;
+        color: #9a9690;
+        font-size: 13px;
+        letter-spacing: 0.02em;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+        color: #9a9690;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 200px;
+        padding: 16px;
+        margin: 0 0 24px;
+        border: 1px solid #2a2926;
+        background: #111110;
+        color: #e8e6e3;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        line-height: 1.55;
+        resize: vertical;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: #3a3834;
+      }
+
+      textarea::placeholder {
+        color: #5c5954;
+      }
+
+      button {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        padding: 14px 22px;
+        border: 1px solid #2a2926;
+        background: transparent;
+        color: #e8e6e3;
+        cursor: pointer;
+      }
+
+      button:hover {
+        color: #c9a227;
+        border-color: #c9a227;
+      }
+
+      button:focus-visible {
+        outline: 1px solid #c9a227;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="column">
+      <h1>What did you consume today?</h1>
+      <p class="subtext">Your face, made of your digital diet</p>
+      <form id="diet-form" action="#" method="post">
+        <textarea
+          id="consumption"
+          name="consumption"
+          aria-label="Paste anything you read, watched, or searched today"
+          placeholder="Paste articles, searches, video titles, notes…"
+          spellcheck="true"
+        ></textarea>
+        <button type="submit">Build my portrait →</button>
+      </form>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+    <script src="sketch.js"></script>
+  </body>
+</html>
