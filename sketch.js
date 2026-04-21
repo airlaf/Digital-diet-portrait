@@ -39,26 +39,33 @@ const WORD_FREQ = {
   hum: 2,
 };
 
-const BLOCK_GRAY_DARK = 32;
-const BLOCK_GRAY_LIGHT = 86;
-const TEXT_GRAY = 228;
-const OVERLAY_ALPHA = 120;
-
 const HAVE_METADATA = typeof HTMLMediaElement !== "undefined" ? HTMLMediaElement.HAVE_METADATA : 1;
+
+const WORD_GAP_X = 10;
+const LINE_GAP_Y = 8;
+const INNER_PAD = 6;
+const BLOCK_PAD = 2;
+const BLOCK_RADIUS = 6;
+const LETTERBOX_LUM_SKIP = 10;
 
 let live = false;
 let capture;
+let comp;
 let layout = [];
-let box = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+let lastVw = 0;
+let lastVh = 0;
 
-const BLOCK_RADIUS = 6;
-const WORD_GAP_X = 10;
-const LINE_GAP_Y = 8;
-const MARGIN = 40;
+function luminance(r, g, b) {
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
 
-function blockGray(t) {
-  const u = constrain(t, 0, 1);
-  return lerpColor(color(BLOCK_GRAY_DARK), color(BLOCK_GRAY_LIGHT), u);
+function letterboxRect(vw, vh, cw, ch) {
+  const s = min(cw / vw, ch / vh);
+  const dw = vw * s;
+  const dh = vh * s;
+  const ox = (cw - dw) * 0.5;
+  const oy = (ch - dh) * 0.5;
+  return { ox, oy, dw, dh };
 }
 
 function normFreq(count, minC, maxC) {
@@ -66,16 +73,57 @@ function normFreq(count, minC, maxC) {
   return (count - minC) / (maxC - minC);
 }
 
+function ensureComp() {
+  if (!comp || comp.width !== width || comp.height !== height) {
+    comp = createGraphics(width, height);
+    // Match logical coords to pixels[] stride (defaults to 2 on HiDPI and breaks manual sampling).
+    comp.pixelDensity(1);
+  }
+}
+
+function avgLumInRect(px, pw, ph, ax0, ay0, ax1, ay1) {
+  const rx0 = min(ax0, ax1);
+  const rx1 = max(ax0, ax1);
+  const ry0 = min(ay0, ay1);
+  const ry1 = max(ay0, ay1);
+  const x0 = constrain(floor(rx0), 0, pw - 1);
+  const x1 = constrain(ceil(rx1), 0, pw - 1);
+  const y0 = constrain(floor(ry0), 0, ph - 1);
+  const y1 = constrain(ceil(ry1), 0, ph - 1);
+  let sum = 0;
+  let n = 0;
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+  const step = max(1, floor(area / 140));
+  for (let y = y0; y <= y1; y += step) {
+    for (let x = x0; x <= x1; x += step) {
+      const i = 4 * (y * pw + x);
+      sum += luminance(px[i], px[i + 1], px[i + 2]);
+      n++;
+    }
+  }
+  return n ? sum / n : 0;
+}
+
 function buildLayout() {
   layout = [];
-  if (!live || width < 32) return;
+  if (!live || !capture || !capture.elt) return;
+  const vw = capture.elt.videoWidth;
+  const vh = capture.elt.videoHeight;
+  if (!vw || !vh || width < 32) return;
 
-  box = {
-    minX: MARGIN,
-    minY: MARGIN,
-    maxX: width - MARGIN,
-    maxY: height - MARGIN,
+  ensureComp();
+  const g = comp;
+  g.textAlign(LEFT, BASELINE);
+  g.textFont(textFont());
+
+  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
+  const box = {
+    minX: ox + INNER_PAD,
+    minY: oy + INNER_PAD,
+    maxX: ox + dw - INNER_PAD,
+    maxY: oy + dh - INNER_PAD,
   };
+  if (box.maxX - box.minX < 40 || box.maxY - box.minY < 40) return;
 
   const entries = Object.entries(WORD_FREQ).sort((a, b) => b[1] - a[1]);
   const counts = entries.map((e) => e[1]);
@@ -89,16 +137,16 @@ function buildLayout() {
   let placed = 0;
   let safety = 0;
 
-  while (y < box.maxY && placed < 6000 && safety < 70000) {
+  while (y < box.maxY && placed < 8000 && safety < 90000) {
     safety++;
     const [word, count] = entries[wi % entries.length];
     wi++;
     const t = normFreq(count, minC, maxC);
     const fontSize = lerp(10, 22, t);
-    textSize(fontSize);
-    const tw = max(textWidth(word), 4);
-    const th = textAscent() + textDescent();
-    const ascent = textAscent();
+    g.textSize(fontSize);
+    const tw = max(g.textWidth(word), 4);
+    const th = g.textAscent() + g.textDescent();
+    const ascent = g.textAscent();
     rowH = max(rowH, th + LINE_GAP_Y);
 
     if (x + tw > box.maxX) {
@@ -112,6 +160,9 @@ function buildLayout() {
     placed++;
     x += tw + WORD_GAP_X;
   }
+
+  lastVw = vw;
+  lastVh = vh;
 }
 
 function videoCanDraw() {
@@ -127,6 +178,7 @@ function startLive() {
   if (landing) landing.style.display = "none";
   document.body.classList.add("portrait-mode");
 
+  pixelDensity(1);
   resizeCanvas(windowWidth, windowHeight);
   textFont("monospace");
   textAlign(LEFT, BASELINE);
@@ -139,15 +191,16 @@ function startLive() {
     v.setAttribute("playsinline", "true");
     v.playsInline = true;
     const play = () => v.play().catch(() => {});
+    const rebuild = () => buildLayout();
     v.addEventListener("loadeddata", play, { once: true });
     v.addEventListener("canplay", play, { once: true });
-    v.addEventListener("loadeddata", () => buildLayout(), { once: true });
+    v.addEventListener("loadeddata", rebuild, { once: true });
     play();
   } catch (e) {
     /* camera blocked */
   }
 
-  buildLayout();
+  setTimeout(buildLayout, 400);
 
   void (async () => {
     try {
@@ -162,23 +215,25 @@ function startLive() {
     } catch (e) {
       textFont("monospace");
     }
-    if (live) buildLayout();
+    buildLayout();
   })();
-
-  setTimeout(() => {
-    if (live) buildLayout();
-  }, 400);
 }
 
 function setup() {
+  pixelDensity(1);
   createCanvas(windowWidth, windowHeight);
   const btn = document.getElementById("start-camera");
   if (btn) btn.addEventListener("click", startLive);
 }
 
 function windowResized() {
+  pixelDensity(1);
   resizeCanvas(windowWidth, windowHeight);
   if (live) buildLayout();
+}
+
+function syncFontToComp() {
+  comp.textFont(textFont());
 }
 
 function draw() {
@@ -187,39 +242,87 @@ function draw() {
     return;
   }
 
-  if (videoCanDraw()) {
-    push();
-    translate(width, 0);
-    scale(-1, 1);
-    image(capture, 0, 0, width, height);
-    pop();
-  } else {
-    background(18, 18, 18);
+  if (!videoCanDraw()) {
+    background(22, 22, 22);
+    fill(160);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text("waiting for camera…", width * 0.5, height * 0.5);
+    return;
   }
 
-  fill(8, 8, 8, OVERLAY_ALPHA);
-  noStroke();
-  rect(0, 0, width, height);
+  const vw = capture.elt.videoWidth;
+  const vh = capture.elt.videoHeight;
+  if (vw !== lastVw || vh !== lastVh) buildLayout();
+  if (layout.length === 0) buildLayout();
 
-  textAlign(LEFT, BASELINE);
+  ensureComp();
+  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
 
-  for (const item of layout) {
-    textSize(lerp(10, 22, item.t));
-    const yDraw = item.y;
-    const pad = 2;
-    fill(blockGray(item.t));
-    noStroke();
-    rect(
-      item.x - pad,
-      yDraw - item.ascent - pad,
-      item.w + pad * 2,
-      item.h + pad * 2,
-      BLOCK_RADIUS,
-      BLOCK_RADIUS,
-      BLOCK_RADIUS,
-      BLOCK_RADIUS
-    );
-    fill(TEXT_GRAY);
-    text(item.word, item.x, yDraw);
+  comp.background(0);
+  comp.image(capture, ox, oy, dw, dh);
+  comp.loadPixels();
+  const px = comp.pixels;
+  const pw = comp.width;
+  const ph = comp.height;
+
+  const lums = [];
+  for (let i = 0; i < layout.length; i++) {
+    const it = layout[i];
+    const x0 = it.x - BLOCK_PAD;
+    const y0 = it.y - it.ascent - BLOCK_PAD;
+    const x1 = it.x + it.w + BLOCK_PAD;
+    const y1 = it.y - it.ascent + it.h + BLOCK_PAD;
+    lums.push(avgLumInRect(px, pw, ph, x0, y0, x1, y1));
   }
+
+  let lo = 255;
+  let hi = 0;
+  for (let i = 0; i < lums.length; i++) {
+    if (lums[i] <= LETTERBOX_LUM_SKIP) continue;
+    lo = min(lo, lums[i]);
+    hi = max(hi, lums[i]);
+  }
+  if (hi - lo < 6) {
+    lo = 0;
+    hi = 255;
+  }
+
+  comp.push();
+  comp.colorMode(HSB, 360, 100, 100, 1);
+  comp.rectMode(CORNER);
+  comp.noStroke();
+  comp.textAlign(LEFT, BASELINE);
+  syncFontToComp();
+
+  for (let i = 0; i < layout.length; i++) {
+    const it = layout[i];
+    const lum = lums[i];
+    if (lum <= LETTERBOX_LUM_SKIP) continue;
+
+    const n = constrain(tNorm(lum, lo, hi), 0, 1);
+    const sat = lerp(6, 42, n);
+    const bri = lerp(94, 26, n);
+    comp.fill(220, sat, bri);
+    comp.rect(it.x - BLOCK_PAD, it.y - it.ascent - BLOCK_PAD, it.w + BLOCK_PAD * 2, it.h + BLOCK_PAD * 2, BLOCK_RADIUS);
+
+    const textB = lerp(98, 22, n);
+    comp.fill(0, 0, textB);
+    comp.textSize(lerp(10, 22, it.t));
+    comp.text(it.word, it.x, it.y);
+  }
+
+  comp.pop();
+  comp.colorMode(RGB, 255, 255, 255, 1);
+
+  push();
+  translate(width, 0);
+  scale(-1, 1);
+  image(comp, 0, 0);
+  pop();
+}
+
+function tNorm(v, a, b) {
+  if (b <= a) return 0.5;
+  return (v - a) / (b - a);
 }
