@@ -41,12 +41,18 @@ const WORD_FREQ = {
 
 const HAVE_METADATA = typeof HTMLMediaElement !== "undefined" ? HTMLMediaElement.HAVE_METADATA : 1;
 
-const WORD_GAP_X = 10;
-const LINE_GAP_Y = 8;
-const INNER_PAD = 6;
-const BLOCK_PAD = 2;
-const BLOCK_RADIUS = 6;
+/** Flush mosaic: no gutter between tiles; inset keeps type off tile edges. */
+const BLOCK_GAP = 0;
+/** Padding inside each colored tile (text sits inset from the sampled region). */
+const TEXT_INSET = 6;
+const BLOCK_RADIUS = 3;
+const TILE_STROKE_RGB = [22, 22, 26];
+const TILE_STROKE_ALPHA = 72;
 const LETTERBOX_LUM_SKIP = 10;
+
+const FONT_SIZE = 14;
+const WEIGHT_MIN = 400;
+const WEIGHT_MAX = 700;
 
 let live = false;
 let capture;
@@ -57,15 +63,6 @@ let lastVh = 0;
 
 function luminance(r, g, b) {
   return 0.299 * r + 0.587 * g + 0.114 * b;
-}
-
-function letterboxRect(vw, vh, cw, ch) {
-  const s = min(cw / vw, ch / vh);
-  const dw = vw * s;
-  const dh = vh * s;
-  const ox = (cw - dw) * 0.5;
-  const oy = (ch - dh) * 0.5;
-  return { ox, oy, dw, dh };
 }
 
 function normFreq(count, minC, maxC) {
@@ -81,7 +78,8 @@ function ensureComp() {
   }
 }
 
-function avgLumInRect(px, pw, ph, ax0, ay0, ax1, ay1) {
+/** Average RGB + luminance under a rect (mirrored feed already in `px`). */
+function avgSampleInRect(px, pw, ph, ax0, ay0, ax1, ay1) {
   const rx0 = min(ax0, ax1);
   const rx1 = max(ax0, ax1);
   const ry0 = min(ay0, ay1);
@@ -90,18 +88,39 @@ function avgLumInRect(px, pw, ph, ax0, ay0, ax1, ay1) {
   const x1 = constrain(ceil(rx1), 0, pw - 1);
   const y0 = constrain(floor(ry0), 0, ph - 1);
   const y1 = constrain(ceil(ry1), 0, ph - 1);
-  let sum = 0;
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let sumL = 0;
   let n = 0;
   const area = (x1 - x0 + 1) * (y1 - y0 + 1);
   const step = max(1, floor(area / 140));
   for (let y = y0; y <= y1; y += step) {
     for (let x = x0; x <= x1; x += step) {
       const i = 4 * (y * pw + x);
-      sum += luminance(px[i], px[i + 1], px[i + 2]);
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      sumR += r;
+      sumG += g;
+      sumB += b;
+      sumL += luminance(r, g, b);
       n++;
     }
   }
-  return n ? sum / n : 0;
+  if (!n) return { r: 0, g: 0, b: 0, lum: 0 };
+  return { r: sumR / n, g: sumG / n, b: sumB / n, lum: sumL / n };
+}
+
+/** Map frequency 0..1 → CSS font weight (higher count = bolder). */
+function weightFromT(t) {
+  return round(lerp(WEIGHT_MIN, WEIGHT_MAX, constrain(t, 0, 1)));
+}
+
+function applyGeistWeight(gfx, weight, sizePx) {
+  gfx.textFont(textFont());
+  gfx.textSize(sizePx);
+  gfx.drawingContext.font = `${weight} ${sizePx}px "Geist Mono", monospace`;
 }
 
 function buildLayout() {
@@ -114,51 +133,51 @@ function buildLayout() {
   ensureComp();
   const g = comp;
   g.textAlign(LEFT, BASELINE);
-  g.textFont(textFont());
 
-  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
-  const box = {
-    minX: ox + INNER_PAD,
-    minY: oy + INNER_PAD,
-    maxX: ox + dw - INNER_PAD,
-    maxY: oy + dh - INNER_PAD,
-  };
-  if (box.maxX - box.minX < 40 || box.maxY - box.minY < 40) return;
+  const box = { minX: 0, minY: 0, maxX: width, maxY: height };
+  if (box.maxX < 40 || box.maxY < 40) return;
+
+  const left0 = box.minX + TEXT_INSET;
+  const top0 = box.minY + TEXT_INSET;
 
   const entries = Object.entries(WORD_FREQ).sort((a, b) => b[1] - a[1]);
   const counts = entries.map((e) => e[1]);
   const minC = min(...counts);
   const maxC = max(...counts);
 
-  let rowH = 14;
-  let x = box.minX;
-  let y = box.minY;
+  let rowTop = top0;
+  let rowMaxTh = 0;
+  let x = left0;
   let wi = 0;
   let placed = 0;
   let safety = 0;
 
-  while (y < box.maxY && placed < 8000 && safety < 90000) {
+  while (rowTop < box.maxY && placed < 8000 && safety < 90000) {
     safety++;
     const [word, count] = entries[wi % entries.length];
-    wi++;
     const t = normFreq(count, minC, maxC);
-    const fontSize = lerp(10, 22, t);
-    g.textSize(fontSize);
+    const weight = weightFromT(t);
+    applyGeistWeight(g, weight, FONT_SIZE);
     const tw = max(g.textWidth(word), 4);
-    const th = g.textAscent() + g.textDescent();
     const ascent = g.textAscent();
-    rowH = max(rowH, th + LINE_GAP_Y);
+    const th = ascent + g.textDescent();
 
-    if (x + tw > box.maxX) {
-      x = box.minX;
-      y += rowH;
-      rowH = 14;
-      continue;
+    if (x + tw + TEXT_INSET > box.maxX) {
+      if (x > left0) {
+        rowTop += rowMaxTh + 2 * TEXT_INSET + BLOCK_GAP;
+        rowMaxTh = 0;
+        x = left0;
+        if (rowTop >= box.maxY) break;
+        continue;
+      }
     }
 
-    layout.push({ word, x, y, w: tw, h: th, ascent, t });
+    const baselineY = rowTop + ascent;
+    layout.push({ word, x, y: baselineY, w: tw, h: th, ascent, t, weight });
+    rowMaxTh = max(rowMaxTh, th);
     placed++;
-    x += tw + WORD_GAP_X;
+    wi++;
+    x += tw + 2 * TEXT_INSET + BLOCK_GAP;
   }
 
   lastVw = vw;
@@ -209,9 +228,12 @@ function startLive() {
         new Promise((r) => setTimeout(r, 2500)),
       ]);
       if (document.fonts && document.fonts.load) {
-        await document.fonts.load('400 16px "IBM Plex Mono"');
+        const px = `${FONT_SIZE}px`;
+        for (const w of [400, 500, 600, 700]) {
+          await document.fonts.load(`${w} ${px} "Geist Mono"`);
+        }
       }
-      textFont("IBM Plex Mono");
+      textFont("Geist Mono");
     } catch (e) {
       textFont("monospace");
     }
@@ -230,10 +252,6 @@ function windowResized() {
   pixelDensity(1);
   resizeCanvas(windowWidth, windowHeight);
   if (live) buildLayout();
-}
-
-function syncFontToComp() {
-  comp.textFont(textFont());
 }
 
 function draw() {
@@ -257,72 +275,55 @@ function draw() {
   if (layout.length === 0) buildLayout();
 
   ensureComp();
-  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
 
   comp.background(0);
-  comp.image(capture, ox, oy, dw, dh);
+  // Stretch + mirror the feed to the full canvas (aspect distortion); text stays unmirrored.
+  comp.push();
+  comp.translate(width, 0);
+  comp.scale(-1, 1);
+  comp.image(capture, 0, 0, width, height);
+  comp.pop();
   comp.loadPixels();
   const px = comp.pixels;
   const pw = comp.width;
   const ph = comp.height;
 
-  const lums = [];
+  const samples = [];
   for (let i = 0; i < layout.length; i++) {
     const it = layout[i];
-    const x0 = it.x - BLOCK_PAD;
-    const y0 = it.y - it.ascent - BLOCK_PAD;
-    const x1 = it.x + it.w + BLOCK_PAD;
-    const y1 = it.y - it.ascent + it.h + BLOCK_PAD;
-    lums.push(avgLumInRect(px, pw, ph, x0, y0, x1, y1));
-  }
-
-  let lo = 255;
-  let hi = 0;
-  for (let i = 0; i < lums.length; i++) {
-    if (lums[i] <= LETTERBOX_LUM_SKIP) continue;
-    lo = min(lo, lums[i]);
-    hi = max(hi, lums[i]);
-  }
-  if (hi - lo < 6) {
-    lo = 0;
-    hi = 255;
+    const x0 = it.x - TEXT_INSET;
+    const y0 = it.y - it.ascent - TEXT_INSET;
+    const x1 = it.x + it.w + TEXT_INSET;
+    const y1 = it.y - it.ascent + it.h + TEXT_INSET;
+    samples.push(avgSampleInRect(px, pw, ph, x0, y0, x1, y1));
   }
 
   comp.push();
-  comp.colorMode(HSB, 360, 100, 100, 1);
+  comp.colorMode(RGB, 255, 255, 255, 255);
   comp.rectMode(CORNER);
-  comp.noStroke();
   comp.textAlign(LEFT, BASELINE);
-  syncFontToComp();
+  comp.strokeWeight(1);
 
   for (let i = 0; i < layout.length; i++) {
     const it = layout[i];
-    const lum = lums[i];
-    if (lum <= LETTERBOX_LUM_SKIP) continue;
+    const s = samples[i];
+    if (s.lum <= LETTERBOX_LUM_SKIP) continue;
 
-    const n = constrain(tNorm(lum, lo, hi), 0, 1);
-    const sat = lerp(6, 42, n);
-    const bri = lerp(94, 26, n);
-    comp.fill(220, sat, bri);
-    comp.rect(it.x - BLOCK_PAD, it.y - it.ascent - BLOCK_PAD, it.w + BLOCK_PAD * 2, it.h + BLOCK_PAD * 2, BLOCK_RADIUS);
+    comp.fill(s.r, s.g, s.b);
+    comp.stroke(TILE_STROKE_RGB[0], TILE_STROKE_RGB[1], TILE_STROKE_RGB[2], TILE_STROKE_ALPHA);
+    comp.rect(it.x - TEXT_INSET, it.y - it.ascent - TEXT_INSET, it.w + 2 * TEXT_INSET, it.h + 2 * TEXT_INSET, BLOCK_RADIUS);
 
-    const textB = lerp(98, 22, n);
-    comp.fill(0, 0, textB);
-    comp.textSize(lerp(10, 22, it.t));
+    comp.noStroke();
+    if (s.lum > 138) {
+      comp.fill(22, 22, 24);
+    } else {
+      comp.fill(244, 242, 238);
+    }
+    applyGeistWeight(comp, it.weight, FONT_SIZE);
     comp.text(it.word, it.x, it.y);
   }
 
   comp.pop();
-  comp.colorMode(RGB, 255, 255, 255, 1);
 
-  push();
-  translate(width, 0);
-  scale(-1, 1);
   image(comp, 0, 0);
-  pop();
-}
-
-function tNorm(v, a, b) {
-  if (b <= a) return 0.5;
-  return (v - a) / (b - a);
 }
