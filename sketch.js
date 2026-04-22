@@ -361,6 +361,9 @@ let continuousShuffleOn = false;
 let lastContinuousShuffleAtMs = 0;
 const CONTINUOUS_SHUFFLE_INTERVAL_MS = 1000;
 
+/** When false, tiles show where the person mask is strong; when true, only where the mask is weak (background). */
+let invertPersonTileMask = false;
+
 /** Brightness multiplier after mapping from slider (see `tileBrightnessMultFromSlider`). */
 let tileBrightnessMult = 1;
 /** Brightness slider max (%). */
@@ -3553,6 +3556,15 @@ function wireContinuousShuffleToggle() {
   }
 }
 
+function wireInvertPersonTileToggle() {
+  const el = document.getElementById("invert-person-tiles");
+  if (!el) return;
+  el.addEventListener("change", () => {
+    invertPersonTileMask = !!el.checked;
+  });
+  invertPersonTileMask = !!el.checked;
+}
+
 function getPortraitCanvasElement() {
   if (typeof canvas !== "undefined" && canvas && canvas.elt) return canvas.elt;
   const el = document.querySelector("canvas");
@@ -3831,6 +3843,7 @@ function setup() {
   const btn = document.getElementById("start-camera");
   if (btn) btn.addEventListener("click", startLive);
   wireContinuousShuffleToggle();
+  wireInvertPersonTileToggle();
   const dlPng = document.getElementById("download-png");
   const dlSvg = document.getElementById("download-svg");
   if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
@@ -3932,7 +3945,9 @@ function draw() {
       const x1 = it.x + it.w + TEXT_INSET;
       const y1 = it.y - it.ascent + it.h + TEXT_INSET;
       const pr = personMaskRatioInCanvasRect(lastPersonSegmentation, x0, y0, x1, y1, width, height);
-      if (pr < PERSON_TILE_THRESHOLD) continue;
+      const onPerson = pr >= PERSON_TILE_THRESHOLD;
+      if (!invertPersonTileMask && !onPerson) continue;
+      if (invertPersonTileMask && onPerson) continue;
     }
     // "error": no segmenter — draw full mosaic (letterbox still hides black bars via lum).
 
