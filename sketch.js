@@ -511,6 +511,10 @@ function applyImportedWordFreq(freq, label) {
     .join(", ");
   setHistoryStatus(`${label}: ${n} unique words (e.g. ${top}…). Ready when you are.`, "ok");
   updateStartCameraEnabled();
+  if (live) {
+    updateTopicStatsPanel();
+    buildLayout();
+  }
 }
 
 async function handleHistoryFile(file) {
@@ -652,6 +656,106 @@ const TOPIC_RGB = {
 function rgbForTopic(id) {
   const c = TOPIC_RGB[id];
   return c ? c.slice() : TOPIC_RGB[TOPIC_IDS.OTHER].slice();
+}
+
+/** Sidebar width (px); must match `.topic-stats-panel` in `index.html`. */
+const TOPIC_STATS_PANEL_W = 220;
+
+const TOPIC_STATS_ORDER = [
+  TOPIC_IDS.POLITICS,
+  TOPIC_IDS.CULTURE,
+  TOPIC_IDS.TECH,
+  TOPIC_IDS.HEALTH,
+  TOPIC_IDS.MONEY,
+  TOPIC_IDS.SCIENCE,
+  TOPIC_IDS.SOCIAL,
+  TOPIC_IDS.PERSONAL,
+  TOPIC_IDS.OTHER,
+];
+
+const TOPIC_LABELS = {
+  [TOPIC_IDS.POLITICS]: "Politics",
+  [TOPIC_IDS.CULTURE]: "Culture",
+  [TOPIC_IDS.TECH]: "Tech",
+  [TOPIC_IDS.HEALTH]: "Health",
+  [TOPIC_IDS.MONEY]: "Money",
+  [TOPIC_IDS.SCIENCE]: "Science",
+  [TOPIC_IDS.SOCIAL]: "Social",
+  [TOPIC_IDS.PERSONAL]: "Personal",
+  [TOPIC_IDS.OTHER]: "Miscellaneous",
+};
+
+/**
+ * @param {Record<string, number>} freq
+ * @returns {Record<string, number>}
+ */
+function aggregateTopicWordCounts(freq) {
+  /** @type {Record<string, number>} */
+  const out = Object.create(null);
+  for (let i = 0; i < TOPIC_STATS_ORDER.length; i++) {
+    out[TOPIC_STATS_ORDER[i]] = 0;
+  }
+  const keys = Object.keys(freq);
+  for (let k = 0; k < keys.length; k++) {
+    const word = keys[k];
+    const n = freq[word];
+    if (!n || n < 1) continue;
+    const topicId = topicForWord(word);
+    out[topicId] = (out[topicId] || 0) + n;
+  }
+  return out;
+}
+
+function updateTopicStatsPanel() {
+  const panel = document.getElementById("topic-stats-panel");
+  const host = document.getElementById("topic-stats-rows");
+  if (!panel || !host) return;
+  if (!live || !tileWordFreq || !Object.keys(tileWordFreq).length) {
+    panel.hidden = true;
+    host.innerHTML = "";
+    return;
+  }
+  panel.hidden = false;
+  const counts = aggregateTopicWordCounts(tileWordFreq);
+  /** @type {{ id: string; n: number }[]} */
+  const ranked = [];
+  for (let i = 0; i < TOPIC_STATS_ORDER.length; i++) {
+    const id = TOPIC_STATS_ORDER[i];
+    if (id === TOPIC_IDS.OTHER) continue;
+    const n = counts[id] != null ? counts[id] : 0;
+    ranked.push({ id, n });
+  }
+  ranked.sort((a, b) => {
+    if (b.n !== a.n) return b.n - a.n;
+    const la = TOPIC_LABELS[a.id] || a.id;
+    const lb = TOPIC_LABELS[b.id] || b.id;
+    return la.localeCompare(lb);
+  });
+  ranked.push({ id: TOPIC_IDS.OTHER, n: counts[TOPIC_IDS.OTHER] != null ? counts[TOPIC_IDS.OTHER] : 0 });
+
+  const parts = [];
+  for (let j = 0; j < ranked.length; j++) {
+    const { id, n } = ranked[j];
+    const label = TOPIC_LABELS[id] || id;
+    const [r, g, b] = rgbForTopic(id);
+    parts.push(
+      `<div class="topic-stats-row"><span class="topic-stats-name"><span class="topic-stats-swatch" style="background:rgb(${r},${g},${b})" aria-hidden="true"></span>${escapeHtml(
+        label,
+      )}</span><span class="topic-stats-count">${n}</span></div>`,
+    );
+  }
+  host.innerHTML = parts.join("");
+}
+
+/**
+ * @param {string} s
+ */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /**
@@ -3427,9 +3531,10 @@ function startLive() {
   document.body.classList.add("portrait-mode");
 
   pixelDensity(1);
-  resizeCanvas(windowWidth, windowHeight);
+  resizeCanvas(max(280, windowWidth - TOPIC_STATS_PANEL_W), windowHeight);
   textFont("monospace");
   textAlign(LEFT, BASELINE);
+  updateTopicStatsPanel();
 
   try {
     capture = createCapture(VIDEO);
@@ -3482,8 +3587,12 @@ function setup() {
 
 function windowResized() {
   pixelDensity(1);
-  resizeCanvas(windowWidth, windowHeight);
-  if (live) buildLayout();
+  if (live) {
+    resizeCanvas(max(280, windowWidth - TOPIC_STATS_PANEL_W), windowHeight);
+    buildLayout();
+  } else {
+    resizeCanvas(windowWidth, windowHeight);
+  }
 }
 
 function draw() {

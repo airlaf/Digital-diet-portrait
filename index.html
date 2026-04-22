@@ -202,6 +202,64 @@
         white-space: nowrap;
         border: 0;
       }
+      .topic-stats-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 220px;
+        height: 100%;
+        z-index: 3;
+        box-sizing: border-box;
+        padding: 20px 14px 28px;
+        border-left: 1px solid #2a2926;
+        background: rgba(10, 10, 10, 0.94);
+        font-family: "Geist Mono", monospace;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .topic-stats-panel[hidden] {
+        display: none !important;
+      }
+      .topic-stats-heading {
+        margin: 0 0 18px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #6f6c66;
+        line-height: 1.35;
+      }
+      .topic-stats-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+      .topic-stats-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .topic-stats-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #e8e6e3;
+        min-width: 0;
+      }
+      .topic-stats-swatch {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+      .topic-stats-count {
+        color: #c9a227;
+        font-variant-numeric: tabular-nums;
+        flex-shrink: 0;
+      }
     </style>
   </head>
   <body>
@@ -266,6 +324,10 @@
         </div>
       </div>
     </div>
+    <aside id="topic-stats-panel" class="topic-stats-panel" hidden aria-label="Word counts by topic">
+      <h2 class="topic-stats-heading">Topic categories</h2>
+      <div class="topic-stats-rows" id="topic-stats-rows"></div>
+    </aside>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
     <script src="sketch.js"></script>
   </body>
