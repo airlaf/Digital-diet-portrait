@@ -308,12 +308,19 @@
         display: none !important;
       }
       .diet-title-heading {
-        margin: 0 0 20px;
+        margin: 0 0 8px;
         font-size: 15px;
         font-weight: 600;
         line-height: 1.3;
         letter-spacing: -0.02em;
         color: #e8e6e3;
+      }
+      .diet-title-desc {
+        margin: 0 0 18px;
+        font-size: 11px;
+        line-height: 1.55;
+        font-weight: 400;
+        color: #6f6c66;
       }
       .diet-toggle-row {
         display: flex;
@@ -493,14 +500,17 @@
     </div>
     <aside id="diet-title-panel" class="diet-title-panel" hidden aria-label="Title and layout controls">
       <h1 class="diet-title-heading">Your Digital Diet</h1>
+      <p class="diet-title-desc">
+        Your browsing words form a live mosaic on the camera. Shuffle them, choose body or background, and tune how
+        the tiles look.
+      </p>
       <div class="diet-toggle-row">
         <input type="checkbox" id="continuous-shuffle" class="diet-toggle-input" />
         <label for="continuous-shuffle" class="diet-toggle-label">Continuous shuffle</label>
       </div>
       <div class="diet-toggle-row">
         <input type="checkbox" id="invert-person-tiles" class="diet-toggle-input" />
-        <label for="invert-person-tiles" class="diet-toggle-label"
-          >Invert — tiles only around the body (environment)</label>
+        <label for="invert-person-tiles" class="diet-toggle-label">Invert</label>
       </div>
       <div class="diet-slider-block">
         <label class="diet-slider-label" for="tile-brightness"
