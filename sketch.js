@@ -355,6 +355,14 @@ function isAcceptableWordToken(w) {
 /** @type {Record<string, number> | null} */
 let tileWordFreq = null;
 
+/** >0 means tile word order is shuffled each layout rebuild; 0 = alphabetical. */
+let layoutShuffleGeneration = 0;
+
+/** 0–1: tile fill, stroke, and label alpha together. */
+let tileFillOpacity = 1;
+/** 0–1: 0 = grayscale tile fills, 1 = full chroma. */
+let tileFillSaturation = 1;
+
 function setHistoryStatus(message, kind) {
   const el = document.getElementById("history-status");
   if (!el) return;
@@ -502,6 +510,7 @@ function applyImportedWordFreq(freq, label) {
     setHistoryStatus("No words found in that file. Try JSON from the extension or a different export.", "err");
     return;
   }
+  layoutShuffleGeneration = 0;
   tileWordFreq = freq;
   const n = Object.keys(freq).length;
   const top = Object.entries(freq)
@@ -660,6 +669,10 @@ function rgbForTopic(id) {
 
 /** Sidebar width (px); must match `.topic-stats-panel` in `index.html`. */
 const TOPIC_STATS_PANEL_W = 220;
+/** Gap between panel and viewport edge (match `.topic-stats-panel` top/right/bottom in `index.html`). */
+const TOPIC_STATS_PANEL_EDGE_INSET = 16;
+/** Width reserved on each side for floating panels + margin (match `index.html`). */
+const LIVE_SIDE_PANEL_RESERVE = TOPIC_STATS_PANEL_W + TOPIC_STATS_PANEL_EDGE_INSET;
 
 const TOPIC_STATS_ORDER = [
   TOPIC_IDS.POLITICS,
@@ -3243,6 +3256,21 @@ function letterboxRect(vw, vh, cw, ch) {
   return { ox, oy, dw, dh };
 }
 
+/**
+ * Letterbox video to fit inside (cw − leftInset − rightInset) × ch, then center
+ * horizontally in the full canvas (symmetric insets keep the frame visually centered).
+ * @param {number} leftInset
+ * @param {number} rightInset
+ */
+function letterboxRectWithSideInsets(vw, vh, cw, ch, leftInset, rightInset) {
+  const L = max(0, leftInset || 0);
+  const R = max(0, rightInset || 0);
+  const innerW = max(1, cw - L - R);
+  const { oy, dw, dh } = letterboxRect(vw, vh, innerW, ch);
+  const ox = (cw - dw) * 0.5;
+  return { ox, oy, dw, dh };
+}
+
 function ensureSegWorkCanvas(w, h) {
   if (!segWorkCanvas || segWorkCanvas.width !== w || segWorkCanvas.height !== h) {
     segWorkCanvas = document.createElement("canvas");
@@ -3253,11 +3281,11 @@ function ensureSegWorkCanvas(w, h) {
 }
 
 /** Black bars + mirrored video (same pixels as on-screen comp). */
-function drawLetterboxedMirrorVideoToCtx(ctx, videoEl, cw, ch) {
+function drawLetterboxedMirrorVideoToCtx(ctx, videoEl, cw, ch, leftInset, rightInset) {
   const vw = videoEl.videoWidth;
   const vh = videoEl.videoHeight;
   if (!vw || !vh) return;
-  const { ox, oy, dw, dh } = letterboxRect(vw, vh, cw, ch);
+  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(vw, vh, cw, ch, leftInset || 0, rightInset || 0);
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, cw, ch);
   ctx.save();
@@ -3269,6 +3297,23 @@ function drawLetterboxedMirrorVideoToCtx(ctx, videoEl, cw, ch) {
 
 function luminance(r, g, b) {
   return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/**
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @param {number} sat 0–1
+ * @returns {[number, number, number]}
+ */
+function rgbWithSaturation(r, g, b, sat) {
+  const lum = luminance(r, g, b);
+  const s = constrain(sat, 0, 1);
+  return [
+    constrain(lum + (r - lum) * s, 0, 255),
+    constrain(lum + (g - lum) * s, 0, 255),
+    constrain(lum + (b - lum) * s, 0, 255),
+  ];
 }
 
 function ensureComp() {
@@ -3395,7 +3440,7 @@ function maybeRequestSegmentation() {
   if (frameCount % SEGMENT_EVERY_N_FRAMES !== 0) return;
   const sc = ensureSegWorkCanvas(width, height);
   const ctx = sc.getContext("2d");
-  drawLetterboxedMirrorVideoToCtx(ctx, capture.elt, width, height);
+  drawLetterboxedMirrorVideoToCtx(ctx, capture.elt, width, height, LIVE_SIDE_PANEL_RESERVE, LIVE_SIDE_PANEL_RESERVE);
   segmentInFlight = true;
   segVideoTimestamp += 1;
   Promise.resolve()
@@ -3434,6 +3479,103 @@ function applyGeistWeight(gfx, weight, sizePx) {
   gfx.drawingContext.font = `${weight} ${sizePx}px "Geist Mono", monospace`;
 }
 
+function shuffleTileLayout() {
+  layoutShuffleGeneration++;
+  if (live) buildLayout();
+}
+
+function getPortraitCanvasElement() {
+  if (typeof canvas !== "undefined" && canvas && canvas.elt) return canvas.elt;
+  const el = document.querySelector("canvas");
+  return el || null;
+}
+
+function escapeXmlAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function triggerDownloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function setDownloadButtonsEnabled(on) {
+  const pngBtn = document.getElementById("download-png");
+  const svgBtn = document.getElementById("download-svg");
+  if (pngBtn) pngBtn.disabled = !on;
+  if (svgBtn) svgBtn.disabled = !on;
+}
+
+function downloadPortraitPng() {
+  if (!live) return;
+  const elt = getPortraitCanvasElement();
+  if (!elt) return;
+  const name = "digital-diet-portrait.png";
+  if (typeof elt.toBlob === "function") {
+    elt.toBlob((blob) => {
+      if (blob) triggerDownloadBlob(blob, name);
+    }, "image/png");
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = elt.toDataURL("image/png");
+  a.download = name;
+  a.click();
+}
+
+function downloadPortraitSvg() {
+  if (!live) return;
+  const elt = getPortraitCanvasElement();
+  if (!elt) return;
+  const dataUrl = elt.toDataURL("image/png");
+  const w = elt.width;
+  const h = elt.height;
+  const hrefEsc = escapeXmlAttr(dataUrl);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <image width="${w}" height="${h}" xlink:href="${hrefEsc}" href="${hrefEsc}"/>
+</svg>
+`;
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  triggerDownloadBlob(blob, "digital-diet-portrait.svg");
+}
+
+function syncTileSliderLabels() {
+  const oEl = document.getElementById("tile-opacity-value");
+  const sEl = document.getElementById("tile-saturation-value");
+  const oIn = document.getElementById("tile-opacity");
+  const sIn = document.getElementById("tile-saturation");
+  if (oEl && oIn) oEl.textContent = `${Math.round(Number(oIn.value))}%`;
+  if (sEl && sIn) sEl.textContent = `${Math.round(Number(sIn.value))}%`;
+}
+
+function wireTileAppearanceSliders() {
+  const oIn = document.getElementById("tile-opacity");
+  const sIn = document.getElementById("tile-saturation");
+  if (oIn) {
+    oIn.addEventListener("input", () => {
+      tileFillOpacity = constrain(Number(oIn.value) / 100, 0, 1);
+      syncTileSliderLabels();
+    });
+  }
+  if (sIn) {
+    sIn.addEventListener("input", () => {
+      tileFillSaturation = constrain(Number(sIn.value) / 100, 0, 1);
+      syncTileSliderLabels();
+    });
+  }
+  tileFillOpacity = oIn ? constrain(Number(oIn.value) / 100, 0, 1) : 1;
+  tileFillSaturation = sIn ? constrain(Number(sIn.value) / 100, 0, 1) : 1;
+  syncTileSliderLabels();
+}
+
 function buildLayout() {
   layout = [];
   if (!live || !capture || !capture.elt) return;
@@ -3445,7 +3587,14 @@ function buildLayout() {
   const g = comp;
   g.textAlign(LEFT, BASELINE);
 
-  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
+  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(
+    vw,
+    vh,
+    width,
+    height,
+    LIVE_SIDE_PANEL_RESERVE,
+    LIVE_SIDE_PANEL_RESERVE,
+  );
   const box = {
     minX: ox + TEXT_INSET,
     minY: oy + TEXT_INSET,
@@ -3459,7 +3608,17 @@ function buildLayout() {
 
   const wordMap =
     tileWordFreq && Object.keys(tileWordFreq).length ? tileWordFreq : DEFAULT_TILE_WORDS;
-  const entries = Object.entries(wordMap).sort((a, b) => a[0].localeCompare(b[0]));
+  const sorted = Object.entries(wordMap).sort((a, b) => a[0].localeCompare(b[0]));
+  let entries = sorted;
+  if (layoutShuffleGeneration > 0) {
+    entries = sorted.slice();
+    for (let i = entries.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = entries[i];
+      entries[i] = entries[j];
+      entries[j] = t;
+    }
+  }
 
   applyGeistWeight(g, LAYOUT_TEXT_WEIGHT, FONT_SIZE_REF);
 
@@ -3530,8 +3689,12 @@ function startLive() {
   if (landing) landing.style.display = "none";
   document.body.classList.add("portrait-mode");
 
+  const dietPanel = document.getElementById("diet-title-panel");
+  if (dietPanel) dietPanel.hidden = false;
+  setDownloadButtonsEnabled(true);
+
   pixelDensity(1);
-  resizeCanvas(max(280, windowWidth - TOPIC_STATS_PANEL_W), windowHeight);
+  resizeCanvas(windowWidth, windowHeight);
   textFont("monospace");
   textAlign(LEFT, BASELINE);
   updateTopicStatsPanel();
@@ -3583,12 +3746,19 @@ function setup() {
   wireHistoryLanding();
   const btn = document.getElementById("start-camera");
   if (btn) btn.addEventListener("click", startLive);
+  const shuffleBtn = document.getElementById("shuffle-tiles");
+  if (shuffleBtn) shuffleBtn.addEventListener("click", shuffleTileLayout);
+  const dlPng = document.getElementById("download-png");
+  const dlSvg = document.getElementById("download-svg");
+  if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
+  if (dlSvg) dlSvg.addEventListener("click", downloadPortraitSvg);
+  wireTileAppearanceSliders();
 }
 
 function windowResized() {
   pixelDensity(1);
   if (live) {
-    resizeCanvas(max(280, windowWidth - TOPIC_STATS_PANEL_W), windowHeight);
+    resizeCanvas(windowWidth, windowHeight);
     buildLayout();
   } else {
     resizeCanvas(windowWidth, windowHeight);
@@ -3620,7 +3790,14 @@ function draw() {
 
   ensureComp();
 
-  const { ox, oy, dw, dh } = letterboxRect(vw, vh, width, height);
+  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(
+    vw,
+    vh,
+    width,
+    height,
+    LIVE_SIDE_PANEL_RESERVE,
+    LIVE_SIDE_PANEL_RESERVE,
+  );
   comp.background(0);
   comp.push();
   comp.translate(ox + dw, oy);
@@ -3651,6 +3828,10 @@ function draw() {
   comp.textAlign(LEFT, BASELINE);
   comp.strokeWeight(1);
 
+  const op = constrain(tileFillOpacity, 0, 1);
+  const sat = constrain(tileFillSaturation, 0, 1);
+  const strokeA = TILE_STROKE_ALPHA * op;
+
   for (let i = 0; i < layout.length; i++) {
     const it = layout[i];
     const s = samples[i];
@@ -3672,33 +3853,36 @@ function draw() {
 
     const useTopicColor = it.topicId != null && it.topicId !== TOPIC_IDS.OTHER;
     if (useTopicColor) {
-      const tr = it.tr;
-      const tg = it.tg;
-      const tb = it.tb;
-      comp.fill(tr, tg, tb);
+      const [tr, tg, tb] = rgbWithSaturation(it.tr, it.tg, it.tb, sat);
+      comp.fill(tr, tg, tb, op * 255);
       const strokeR = constrain(round(tr * 0.42), 0, 80);
       const strokeG = constrain(round(tg * 0.42), 0, 80);
       const strokeB = constrain(round(tb * 0.42), 0, 80);
-      comp.stroke(strokeR, strokeG, strokeB, TILE_STROKE_ALPHA);
+      comp.stroke(strokeR, strokeG, strokeB, strokeA);
     } else {
-      comp.fill(s.r, s.g, s.b);
-      comp.stroke(TILE_STROKE_RGB[0], TILE_STROKE_RGB[1], TILE_STROKE_RGB[2], TILE_STROKE_ALPHA);
+      const [tr, tg, tb] = rgbWithSaturation(s.r, s.g, s.b, sat);
+      comp.fill(tr, tg, tb, op * 255);
+      const [sr0, sg0, sb0] = rgbWithSaturation(TILE_STROKE_RGB[0], TILE_STROKE_RGB[1], TILE_STROKE_RGB[2], sat);
+      comp.stroke(sr0, sg0, sb0, strokeA);
     }
     comp.rect(it.x - TEXT_INSET, it.y - it.ascent - TEXT_INSET, it.w + 2 * TEXT_INSET, it.h + 2 * TEXT_INSET, BLOCK_RADIUS);
 
     comp.noStroke();
     if (useTopicColor) {
-      const tileLum = luminance(it.tr, it.tg, it.tb);
+      const [tr, tg, tb] = rgbWithSaturation(it.tr, it.tg, it.tb, sat);
+      const tileLum = luminance(tr, tg, tb);
       if (tileLum > 138) {
-        comp.fill(22, 22, 24);
+        comp.fill(22, 22, 24, op * 255);
       } else {
-        comp.fill(244, 242, 238);
+        comp.fill(244, 242, 238, op * 255);
       }
     } else {
-      if (s.lum > 138) {
-        comp.fill(22, 22, 24);
+      const [tr, tg, tb] = rgbWithSaturation(s.r, s.g, s.b, sat);
+      const tileLum = luminance(tr, tg, tb);
+      if (tileLum > 138) {
+        comp.fill(22, 22, 24, op * 255);
       } else {
-        comp.fill(244, 242, 238);
+        comp.fill(244, 242, 238, op * 255);
       }
     }
     applyGeistWeight(comp, it.weight != null ? it.weight : LAYOUT_TEXT_WEIGHT, FONT_SIZE_REF);
