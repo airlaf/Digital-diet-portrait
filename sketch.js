@@ -359,7 +359,7 @@ let tileWordFreq = null;
 let continuousShuffleOn = false;
 /** millis() timestamp of last periodic shuffle (or when toggle was turned on). */
 let lastContinuousShuffleAtMs = 0;
-const CONTINUOUS_SHUFFLE_INTERVAL_MS = 1000;
+const CONTINUOUS_SHUFFLE_INTERVAL_MS = 500;
 
 /** When false, tiles show where the person mask is strong; when true, only where the mask is weak (background). */
 let invertPersonTileMask = false;
@@ -666,7 +666,7 @@ const TOPIC_IDS = {
   OTHER: "other",
 };
 
-/** RGB fills: Politics cold blue, Culture terracotta, Tech cyan/teal, Health soft green, Money amber, Science violet, Social hot pink, Personal cream, Other neutral. */
+/** Default RGB fills (editable copy lives in `topicRgbById`). */
 const TOPIC_RGB = {
   [TOPIC_IDS.POLITICS]: [76, 126, 184],
   [TOPIC_IDS.CULTURE]: [178, 94, 68],
@@ -679,13 +679,38 @@ const TOPIC_RGB = {
   [TOPIC_IDS.OTHER]: [96, 94, 90],
 };
 
+/** @type {Record<string, [number, number, number]>} */
+let topicRgbById = Object.fromEntries(
+  Object.keys(TOPIC_RGB).map((k) => /** @type {[string, [number, number, number]]} */ ([k, TOPIC_RGB[k].slice()])),
+);
+
+/**
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ */
+function rgbToHex(r, g, b) {
+  const h = (n) => constrain(round(n), 0, 255).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/**
+ * @param {string} hex
+ * @returns {[number, number, number] | null}
+ */
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(hex).trim());
+  if (!m) return null;
+  return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+}
+
 /**
  * @param {string} id
  * @returns {[number, number, number]}
  */
 function rgbForTopic(id) {
-  const c = TOPIC_RGB[id];
-  return c ? c.slice() : TOPIC_RGB[TOPIC_IDS.OTHER].slice();
+  const c = topicRgbById[id];
+  return c ? c.slice() : topicRgbById[TOPIC_IDS.OTHER].slice();
 }
 
 /** Sidebar width (px); must match `.topic-stats-panel` in `index.html`. */
@@ -783,13 +808,41 @@ function updateTopicStatsPanel() {
     const { id, n } = ranked[j];
     const label = TOPIC_LABELS[id] || id;
     const [r, g, b] = rgbForTopic(id);
+    const safeId = escapeHtml(id);
+    const nameInner =
+      id === TOPIC_IDS.OTHER
+        ? `<span class="topic-stats-swatch" style="background:rgb(${r},${g},${b})" aria-hidden="true" title="Tiles in this bucket use the camera colors, not this swatch"></span><span class="topic-stats-label">${escapeHtml(
+            label,
+          )}</span>`
+        : `<input type="color" class="topic-stats-color" data-topic-id="${safeId}" value="${rgbToHex(
+            r,
+            g,
+            b,
+          )}" title="Color for ${escapeHtml(label)}" aria-label="Color for ${escapeHtml(label)}" /><span class="topic-stats-label">${escapeHtml(
+            label,
+          )}</span>`;
     parts.push(
-      `<div class="topic-stats-row"><span class="topic-stats-name"><span class="topic-stats-swatch" style="background:rgb(${r},${g},${b})" aria-hidden="true"></span>${escapeHtml(
-        label,
-      )}</span><span class="topic-stats-count">${n}</span></div>`,
+      `<div class="topic-stats-row"><span class="topic-stats-name">${nameInner}</span><span class="topic-stats-count">${n}</span></div>`,
     );
   }
   host.innerHTML = parts.join("");
+}
+
+function wireTopicColorInputs() {
+  const host = document.getElementById("topic-stats-rows");
+  if (!host || host.dataset.topicColorWired === "1") return;
+  host.dataset.topicColorWired = "1";
+  const apply = (ev) => {
+    const el = ev.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== "color" || !el.classList.contains("topic-stats-color")) return;
+    const id = el.dataset.topicId;
+    if (!id) return;
+    const rgb = hexToRgb(el.value);
+    if (!rgb) return;
+    topicRgbById[id] = rgb;
+  };
+  host.addEventListener("input", apply);
+  host.addEventListener("change", apply);
 }
 
 /**
@@ -3728,7 +3781,6 @@ function buildLayout() {
     safety++;
     const [word] = entries[wi % entries.length];
     const topicId = topicForWord(word);
-    const [tr, tg, tb] = rgbForTopic(topicId);
     const tw = max(g.textWidth(word), 4);
     const ascent = g.textAscent();
     const th = ascent + g.textDescent();
@@ -3753,9 +3805,6 @@ function buildLayout() {
       ascent,
       weight: LAYOUT_TEXT_WEIGHT,
       topicId,
-      tr,
-      tg,
-      tb,
     });
     rowMaxTh = max(rowMaxTh, th);
     placed++;
@@ -3844,6 +3893,7 @@ function setup() {
   if (btn) btn.addEventListener("click", startLive);
   wireContinuousShuffleToggle();
   wireInvertPersonTileToggle();
+  wireTopicColorInputs();
   const dlPng = document.getElementById("download-png");
   const dlSvg = document.getElementById("download-svg");
   if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
@@ -3953,7 +4003,8 @@ function draw() {
 
     const useTopicColor = it.topicId != null && it.topicId !== TOPIC_IDS.OTHER;
     if (useTopicColor) {
-      const [tr, tg, tb] = tileSurfaceRgb(it.tr, it.tg, it.tb, sat, bright);
+      const [r0, g0, b0] = rgbForTopic(it.topicId);
+      const [tr, tg, tb] = tileSurfaceRgb(r0, g0, b0, sat, bright);
       comp.fill(tr, tg, tb);
       const strokeR = constrain(round(tr * 0.42), 0, 80);
       const strokeG = constrain(round(tg * 0.42), 0, 80);
@@ -3975,7 +4026,8 @@ function draw() {
 
     comp.noStroke();
     if (useTopicColor) {
-      const [tr, tg, tb] = tileSurfaceRgb(it.tr, it.tg, it.tb, sat, bright);
+      const [r0, g0, b0] = rgbForTopic(it.topicId);
+      const [tr, tg, tb] = tileSurfaceRgb(r0, g0, b0, sat, bright);
       const tileLum = luminance(tr, tg, tb);
       if (tileLum > 138) {
         comp.fill(...rgbWithBrightness(22, 22, 24, bright));

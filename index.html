@@ -237,7 +237,7 @@
       }
       .topic-stats-row {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
         gap: 10px;
         font-size: 12px;
@@ -251,10 +251,36 @@
         min-width: 0;
       }
       .topic-stats-swatch {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 2px;
         flex-shrink: 0;
+        border: 1px solid #3a3834;
+      }
+      .topic-stats-label {
+        min-width: 0;
+      }
+      .topic-stats-color {
+        width: 26px;
+        height: 22px;
+        padding: 0;
+        border: 1px solid #3a3834;
+        border-radius: 4px;
+        cursor: pointer;
+        flex-shrink: 0;
+        background: transparent;
+        vertical-align: middle;
+      }
+      .topic-stats-color::-webkit-color-swatch-wrapper {
+        padding: 2px;
+      }
+      .topic-stats-color::-webkit-color-swatch {
+        border: none;
+        border-radius: 2px;
+      }
+      .topic-stats-color::-moz-color-swatch {
+        border: none;
+        border-radius: 2px;
       }
       .topic-stats-count {
         color: #c9a227;
