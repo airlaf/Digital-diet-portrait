@@ -355,8 +355,11 @@ function isAcceptableWordToken(w) {
 /** @type {Record<string, number> | null} */
 let tileWordFreq = null;
 
-/** >0 means tile word order is shuffled each layout rebuild; 0 = alphabetical. */
-let layoutShuffleGeneration = 0;
+/** When true, word order is randomized on each layout rebuild and periodically in draw() while live. */
+let continuousShuffleOn = false;
+/** millis() timestamp of last periodic shuffle (or when toggle was turned on). */
+let lastContinuousShuffleAtMs = 0;
+const CONTINUOUS_SHUFFLE_INTERVAL_MS = 1000;
 
 /** Brightness multiplier after mapping from slider (see `tileBrightnessMultFromSlider`). */
 let tileBrightnessMult = 1;
@@ -526,7 +529,6 @@ function applyImportedWordFreq(freq, label) {
     setHistoryStatus("No words found in that file. Try JSON from the extension or a different export.", "err");
     return;
   }
-  layoutShuffleGeneration = 0;
   tileWordFreq = freq;
   const n = Object.keys(freq).length;
   const top = Object.entries(freq)
@@ -3524,9 +3526,31 @@ function applyGeistWeight(gfx, weight, sizePx) {
   gfx.drawingContext.font = `${weight} ${sizePx}px "Geist Mono", monospace`;
 }
 
-function shuffleTileLayout() {
-  layoutShuffleGeneration++;
-  if (live) buildLayout();
+/** Called from draw() so shuffles stay on p5's redraw loop (more reliable than setInterval). */
+function maybeContinuousShuffleFromDraw() {
+  if (!continuousShuffleOn || !live) return;
+  const now = millis();
+  if (now - lastContinuousShuffleAtMs < CONTINUOUS_SHUFFLE_INTERVAL_MS) return;
+  lastContinuousShuffleAtMs = now;
+  buildLayout();
+}
+
+function wireContinuousShuffleToggle() {
+  const el = document.getElementById("continuous-shuffle");
+  if (!el) return;
+  el.addEventListener("change", () => {
+    continuousShuffleOn = !!el.checked;
+    if (continuousShuffleOn) {
+      lastContinuousShuffleAtMs = millis();
+      if (live) buildLayout();
+    } else if (live) {
+      buildLayout();
+    }
+  });
+  if (el.checked) {
+    continuousShuffleOn = true;
+    lastContinuousShuffleAtMs = millis();
+  }
 }
 
 function getPortraitCanvasElement() {
@@ -3669,7 +3693,7 @@ function buildLayout() {
     tileWordFreq && Object.keys(tileWordFreq).length ? tileWordFreq : DEFAULT_TILE_WORDS;
   const sorted = Object.entries(wordMap).sort((a, b) => a[0].localeCompare(b[0]));
   let entries = sorted;
-  if (layoutShuffleGeneration > 0) {
+  if (continuousShuffleOn) {
     entries = sorted.slice();
     for (let i = entries.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -3757,6 +3781,7 @@ function startLive() {
   textFont("monospace");
   textAlign(LEFT, BASELINE);
   updateTopicStatsPanel();
+  if (continuousShuffleOn) lastContinuousShuffleAtMs = millis();
 
   try {
     capture = createCapture(VIDEO);
@@ -3805,8 +3830,7 @@ function setup() {
   wireHistoryLanding();
   const btn = document.getElementById("start-camera");
   if (btn) btn.addEventListener("click", startLive);
-  const shuffleBtn = document.getElementById("shuffle-tiles");
-  if (shuffleBtn) shuffleBtn.addEventListener("click", shuffleTileLayout);
+  wireContinuousShuffleToggle();
   const dlPng = document.getElementById("download-png");
   const dlSvg = document.getElementById("download-svg");
   if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
@@ -3846,6 +3870,8 @@ function draw() {
     buildLayout();
   }
   if (layout.length === 0) buildLayout();
+
+  maybeContinuousShuffleFromDraw();
 
   ensureComp();
 

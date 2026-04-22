@@ -289,22 +289,27 @@
         letter-spacing: -0.02em;
         color: #e8e6e3;
       }
-      .diet-shuffle-btn {
+      .diet-toggle-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin: 0 0 20px;
+      }
+      .diet-toggle-input {
+        margin-top: 2px;
+        width: 17px;
+        height: 17px;
+        accent-color: #c9a227;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .diet-toggle-label {
         font-family: "Geist Mono", monospace;
         font-size: 12px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        padding: 12px 16px;
-        border: 1px solid #2a2926;
-        background: transparent;
+        line-height: 1.45;
         color: #e8e6e3;
         cursor: pointer;
-        border-radius: 2px;
-        width: 100%;
-      }
-      .diet-shuffle-btn:hover {
-        color: #c9a227;
-        border-color: #c9a227;
+        user-select: none;
       }
       .diet-slider-block {
         margin-top: 18px;
@@ -462,7 +467,10 @@
     </div>
     <aside id="diet-title-panel" class="diet-title-panel" hidden aria-label="Title and layout controls">
       <h1 class="diet-title-heading">Your Digital Diet</h1>
-      <button type="button" class="diet-shuffle-btn" id="shuffle-tiles">Shuffle</button>
+      <div class="diet-toggle-row">
+        <input type="checkbox" id="continuous-shuffle" class="diet-toggle-input" />
+        <label for="continuous-shuffle" class="diet-toggle-label">Continuous shuffle</label>
+      </div>
       <div class="diet-slider-block">
         <label class="diet-slider-label" for="tile-brightness"
           >Brightness <span class="diet-slider-value" id="tile-brightness-value">100%</span></label
