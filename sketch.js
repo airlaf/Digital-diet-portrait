@@ -358,10 +358,21 @@ let tileWordFreq = null;
 /** >0 means tile word order is shuffled each layout rebuild; 0 = alphabetical. */
 let layoutShuffleGeneration = 0;
 
-/** 0–1: tile fill, stroke, and label alpha together. */
-let tileFillOpacity = 1;
-/** 0–1: 0 = grayscale tile fills, 1 = full chroma. */
+/** Brightness multiplier after mapping from slider (see `tileBrightnessMultFromSlider`). */
+let tileBrightnessMult = 1;
+/** Brightness slider max (%). */
+const TILE_BRIGHTNESS_UI_MAX = 200;
+/** Multiplier at slider 0% — keeps tiles dim but not pure black. */
+const TILE_BRIGHTNESS_MULT_MIN = 0.28;
+/** Chroma vs luminance: 0 = gray, 1 = source color, >1 oversaturated (see TILE_SATURATION_UI_MAX). */
 let tileFillSaturation = 1;
+/** Saturation slider max (%); 100% = true color, above = extra punch. */
+const TILE_SATURATION_UI_MAX = 220;
+
+const TILE_FONT_SIZE_MIN = 8;
+const TILE_FONT_SIZE_MAX = 28;
+/** Mosaic tile font size (px); synced with #tile-text-size. */
+let tileFontSizePx = 14;
 
 function setHistoryStatus(message, kind) {
   const el = document.getElementById("history-status");
@@ -410,20 +421,6 @@ function mergeFreq(a, b) {
   return o;
 }
 
-function textFromUrl(u) {
-  const raw = String(u || "").trim();
-  if (!raw) return "";
-  try {
-    const url = new URL(raw.includes("://") ? raw : `https://${raw}`);
-    const host = url.hostname.replace(/^www\./i, "");
-    const hostParts = host.split(".").filter((p) => p.length > 2 && !NOISE_WORDS.has(p.toLowerCase()));
-    const pathParts = url.pathname.split(/[/._-]+/).filter((p) => p.length > 1);
-    return `${hostParts.join(" ")} ${pathParts.join(" ")}`;
-  } catch {
-    return raw.replace(/https?:\/\//gi, " ");
-  }
-}
-
 function wordFreqFromPlainText(text) {
   return freqFromTokens(tokenizeWords(text));
 }
@@ -469,9 +466,11 @@ function parseHistoryCsv(text) {
   }
   for (let i = 1; i < lines.length; i++) {
     const row = parseCsvLine(lines[i]);
-    const t = idxTitle >= 0 ? row[idxTitle] : "";
-    const u = idxUrl >= 0 ? row[idxUrl] : "";
-    merged = mergeFreq(merged, wordFreqFromPlainText(`${t} ${textFromUrl(u)}`));
+    if (idxTitle >= 0) {
+      const t = row[idxTitle] ?? "";
+      merged = mergeFreq(merged, wordFreqFromPlainText(String(t)));
+    }
+    // URL column is ignored: we only count words from titles / pasted text (what you read), not host/path tokens.
   }
   return merged;
 }
@@ -485,14 +484,31 @@ function extractJsonRecords(data) {
   return [];
 }
 
+/**
+ * Reader-facing text from a history row (no URL parsing — avoids google/mail/calendar host noise).
+ * @param {Record<string, unknown>} rec
+ */
+function readingTextFromHistoryRecord(rec) {
+  const title = rec.title ?? rec.name ?? rec.pageTitle ?? rec.page_title ?? "";
+  const extra =
+    rec.description ??
+    rec.snippet ??
+    rec.metaDescription ??
+    rec.meta_description ??
+    rec.summary ??
+    "";
+  const s = `${String(title)} ${String(extra)}`.trim();
+  return s;
+}
+
 function wordFreqFromHistoryRecords(records) {
   /** @type {Record<string, number>} */
   let merged = Object.create(null);
   for (const rec of records) {
     if (!rec || typeof rec !== "object") continue;
-    const title = rec.title ?? rec.name ?? rec.pageTitle ?? "";
-    const url = rec.url ?? rec.URL ?? rec.uri ?? rec.href ?? rec.link ?? "";
-    merged = mergeFreq(merged, wordFreqFromPlainText(`${title} ${textFromUrl(String(url))}`));
+    const text = readingTextFromHistoryRecord(rec);
+    if (!text) continue;
+    merged = mergeFreq(merged, wordFreqFromPlainText(text));
   }
   return merged;
 }
@@ -719,6 +735,17 @@ function aggregateTopicWordCounts(freq) {
   return out;
 }
 
+/**
+ * @param {string} s
+ */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function updateTopicStatsPanel() {
   const panel = document.getElementById("topic-stats-panel");
   const host = document.getElementById("topic-stats-rows");
@@ -758,17 +785,6 @@ function updateTopicStatsPanel() {
     );
   }
   host.innerHTML = parts.join("");
-}
-
-/**
- * @param {string} s
- */
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 /**
@@ -3226,8 +3242,7 @@ function topicForWord(raw) {
   return TOPIC_IDS.OTHER;
 }
 
-/** Reference size for UI copy, font warmup, and mosaic tiles. */
-const FONT_SIZE_REF = 14;
+/** Mosaic tile font weight. */
 const LAYOUT_TEXT_WEIGHT = 500;
 
 let live = false;
@@ -3303,17 +3318,47 @@ function luminance(r, g, b) {
  * @param {number} r
  * @param {number} g
  * @param {number} b
- * @param {number} sat 0–1
+ * @param {number} sat 0 = grayscale, 1 = original chroma, >1 extrapolates saturation (RGB clamped).
  * @returns {[number, number, number]}
  */
 function rgbWithSaturation(r, g, b, sat) {
   const lum = luminance(r, g, b);
-  const s = constrain(sat, 0, 1);
+  const s = max(0, sat);
   return [
     constrain(lum + (r - lum) * s, 0, 255),
     constrain(lum + (g - lum) * s, 0, 255),
     constrain(lum + (b - lum) * s, 0, 255),
   ];
+}
+
+/**
+ * @param {number} mult >= 0; 1 leaves RGB unchanged.
+ * @returns {[number, number, number]}
+ */
+function rgbWithBrightness(r, g, b, mult) {
+  const m = max(0, mult);
+  return [constrain(r * m, 0, 255), constrain(g * m, 0, 255), constrain(b * m, 0, 255)];
+}
+
+/**
+ * Maps slider 0…200 (%) to multiplier: 0% → TILE_BRIGHTNESS_MULT_MIN, 100% → 1, 200% → 2.
+ * @param {number} sliderRaw
+ */
+function tileBrightnessMultFromSlider(sliderRaw) {
+  const p = constrain(Number(sliderRaw) / 100, 0, TILE_BRIGHTNESS_UI_MAX / 100);
+  if (p <= 1) {
+    return TILE_BRIGHTNESS_MULT_MIN + p * (1 - TILE_BRIGHTNESS_MULT_MIN);
+  }
+  return p;
+}
+
+/**
+ * @param {number} sat
+ * @param {number} bright
+ */
+function tileSurfaceRgb(r, g, b, sat, bright) {
+  const [a, b0, c] = rgbWithSaturation(r, g, b, sat);
+  return rgbWithBrightness(a, b0, c, bright);
 }
 
 function ensureComp() {
@@ -3548,31 +3593,45 @@ function downloadPortraitSvg() {
 }
 
 function syncTileSliderLabels() {
-  const oEl = document.getElementById("tile-opacity-value");
+  const bEl = document.getElementById("tile-brightness-value");
   const sEl = document.getElementById("tile-saturation-value");
-  const oIn = document.getElementById("tile-opacity");
+  const zEl = document.getElementById("tile-text-size-value");
+  const bIn = document.getElementById("tile-brightness");
   const sIn = document.getElementById("tile-saturation");
-  if (oEl && oIn) oEl.textContent = `${Math.round(Number(oIn.value))}%`;
+  const zIn = document.getElementById("tile-text-size");
+  if (bEl && bIn) bEl.textContent = `${Math.round(Number(bIn.value))}%`;
   if (sEl && sIn) sEl.textContent = `${Math.round(Number(sIn.value))}%`;
+  if (zEl && zIn) zEl.textContent = `${Math.round(Number(zIn.value))}px`;
 }
 
 function wireTileAppearanceSliders() {
-  const oIn = document.getElementById("tile-opacity");
+  const bIn = document.getElementById("tile-brightness");
   const sIn = document.getElementById("tile-saturation");
-  if (oIn) {
-    oIn.addEventListener("input", () => {
-      tileFillOpacity = constrain(Number(oIn.value) / 100, 0, 1);
+  const zIn = document.getElementById("tile-text-size");
+  if (bIn) {
+    bIn.addEventListener("input", () => {
+      tileBrightnessMult = tileBrightnessMultFromSlider(Number(bIn.value));
       syncTileSliderLabels();
     });
   }
   if (sIn) {
     sIn.addEventListener("input", () => {
-      tileFillSaturation = constrain(Number(sIn.value) / 100, 0, 1);
+      tileFillSaturation = constrain(Number(sIn.value) / 100, 0, TILE_SATURATION_UI_MAX / 100);
       syncTileSliderLabels();
     });
   }
-  tileFillOpacity = oIn ? constrain(Number(oIn.value) / 100, 0, 1) : 1;
-  tileFillSaturation = sIn ? constrain(Number(sIn.value) / 100, 0, 1) : 1;
+  if (zIn) {
+    zIn.addEventListener("input", () => {
+      tileFontSizePx = constrain(Math.round(Number(zIn.value)), TILE_FONT_SIZE_MIN, TILE_FONT_SIZE_MAX);
+      syncTileSliderLabels();
+      if (live) buildLayout();
+    });
+  }
+  tileBrightnessMult = bIn ? tileBrightnessMultFromSlider(Number(bIn.value)) : 1;
+  tileFillSaturation = sIn ? constrain(Number(sIn.value) / 100, 0, TILE_SATURATION_UI_MAX / 100) : 1;
+  tileFontSizePx = zIn
+    ? constrain(Math.round(Number(zIn.value)), TILE_FONT_SIZE_MIN, TILE_FONT_SIZE_MAX)
+    : 14;
   syncTileSliderLabels();
 }
 
@@ -3620,7 +3679,7 @@ function buildLayout() {
     }
   }
 
-  applyGeistWeight(g, LAYOUT_TEXT_WEIGHT, FONT_SIZE_REF);
+  applyGeistWeight(g, LAYOUT_TEXT_WEIGHT, tileFontSizePx);
 
   let rowTop = top0;
   let rowMaxTh = 0;
@@ -3727,7 +3786,7 @@ function startLive() {
         new Promise((r) => setTimeout(r, 2500)),
       ]);
       if (document.fonts && document.fonts.load) {
-        const px = `${FONT_SIZE_REF}px`;
+        const px = `${tileFontSizePx}px`;
         for (const w of [400, 500, 600, 700]) {
           await document.fonts.load(`${w} ${px} "Geist Mono"`);
         }
@@ -3828,9 +3887,9 @@ function draw() {
   comp.textAlign(LEFT, BASELINE);
   comp.strokeWeight(1);
 
-  const op = constrain(tileFillOpacity, 0, 1);
-  const sat = constrain(tileFillSaturation, 0, 1);
-  const strokeA = TILE_STROKE_ALPHA * op;
+  const bright = constrain(tileBrightnessMult, TILE_BRIGHTNESS_MULT_MIN, TILE_BRIGHTNESS_UI_MAX / 100);
+  const sat = constrain(tileFillSaturation, 0, TILE_SATURATION_UI_MAX / 100);
+  const strokeA = TILE_STROKE_ALPHA;
 
   for (let i = 0; i < layout.length; i++) {
     const it = layout[i];
@@ -3853,39 +3912,45 @@ function draw() {
 
     const useTopicColor = it.topicId != null && it.topicId !== TOPIC_IDS.OTHER;
     if (useTopicColor) {
-      const [tr, tg, tb] = rgbWithSaturation(it.tr, it.tg, it.tb, sat);
-      comp.fill(tr, tg, tb, op * 255);
+      const [tr, tg, tb] = tileSurfaceRgb(it.tr, it.tg, it.tb, sat, bright);
+      comp.fill(tr, tg, tb);
       const strokeR = constrain(round(tr * 0.42), 0, 80);
       const strokeG = constrain(round(tg * 0.42), 0, 80);
       const strokeB = constrain(round(tb * 0.42), 0, 80);
       comp.stroke(strokeR, strokeG, strokeB, strokeA);
     } else {
-      const [tr, tg, tb] = rgbWithSaturation(s.r, s.g, s.b, sat);
-      comp.fill(tr, tg, tb, op * 255);
-      const [sr0, sg0, sb0] = rgbWithSaturation(TILE_STROKE_RGB[0], TILE_STROKE_RGB[1], TILE_STROKE_RGB[2], sat);
+      const [tr, tg, tb] = tileSurfaceRgb(s.r, s.g, s.b, sat, bright);
+      comp.fill(tr, tg, tb);
+      const [sr0, sg0, sb0] = tileSurfaceRgb(
+        TILE_STROKE_RGB[0],
+        TILE_STROKE_RGB[1],
+        TILE_STROKE_RGB[2],
+        sat,
+        bright,
+      );
       comp.stroke(sr0, sg0, sb0, strokeA);
     }
     comp.rect(it.x - TEXT_INSET, it.y - it.ascent - TEXT_INSET, it.w + 2 * TEXT_INSET, it.h + 2 * TEXT_INSET, BLOCK_RADIUS);
 
     comp.noStroke();
     if (useTopicColor) {
-      const [tr, tg, tb] = rgbWithSaturation(it.tr, it.tg, it.tb, sat);
+      const [tr, tg, tb] = tileSurfaceRgb(it.tr, it.tg, it.tb, sat, bright);
       const tileLum = luminance(tr, tg, tb);
       if (tileLum > 138) {
-        comp.fill(22, 22, 24, op * 255);
+        comp.fill(...rgbWithBrightness(22, 22, 24, bright));
       } else {
-        comp.fill(244, 242, 238, op * 255);
+        comp.fill(...rgbWithBrightness(244, 242, 238, bright));
       }
     } else {
-      const [tr, tg, tb] = rgbWithSaturation(s.r, s.g, s.b, sat);
+      const [tr, tg, tb] = tileSurfaceRgb(s.r, s.g, s.b, sat, bright);
       const tileLum = luminance(tr, tg, tb);
       if (tileLum > 138) {
-        comp.fill(22, 22, 24, op * 255);
+        comp.fill(...rgbWithBrightness(22, 22, 24, bright));
       } else {
-        comp.fill(244, 242, 238, op * 255);
+        comp.fill(...rgbWithBrightness(244, 242, 238, bright));
       }
     }
-    applyGeistWeight(comp, it.weight != null ? it.weight : LAYOUT_TEXT_WEIGHT, FONT_SIZE_REF);
+    applyGeistWeight(comp, it.weight != null ? it.weight : LAYOUT_TEXT_WEIGHT, tileFontSizePx);
     comp.text(it.word, it.x, it.y);
   }
 
