@@ -371,14 +371,14 @@ const TILE_BRIGHTNESS_UI_MAX = 200;
 /** Multiplier at slider 0% — keeps tiles dim but not pure black. */
 const TILE_BRIGHTNESS_MULT_MIN = 0.28;
 /** Chroma vs luminance: 0 = gray, 1 = source color, >1 oversaturated (see TILE_SATURATION_UI_MAX). */
-let tileFillSaturation = 1;
+let tileFillSaturation = 1.5;
 /** Saturation slider max (%); 100% = true color, above = extra punch. */
 const TILE_SATURATION_UI_MAX = 220;
 
 const TILE_FONT_SIZE_MIN = 8;
 const TILE_FONT_SIZE_MAX = 28;
 /** Mosaic tile font size (px); synced with #tile-text-size. */
-let tileFontSizePx = 14;
+let tileFontSizePx = 12;
 
 function setHistoryStatus(message, kind) {
   const el = document.getElementById("history-status");
@@ -3717,10 +3717,10 @@ function wireTileAppearanceSliders() {
     });
   }
   tileBrightnessMult = bIn ? tileBrightnessMultFromSlider(Number(bIn.value)) : 1;
-  tileFillSaturation = sIn ? constrain(Number(sIn.value) / 100, 0, TILE_SATURATION_UI_MAX / 100) : 1;
+  tileFillSaturation = sIn ? constrain(Number(sIn.value) / 100, 0, TILE_SATURATION_UI_MAX / 100) : 1.5;
   tileFontSizePx = zIn
     ? constrain(Math.round(Number(zIn.value)), TILE_FONT_SIZE_MIN, TILE_FONT_SIZE_MAX)
-    : 14;
+    : 12;
   syncTileSliderLabels();
 }
 
