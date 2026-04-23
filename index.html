@@ -122,13 +122,14 @@
         background: transparent;
         color: #ffffff;
         cursor: pointer;
-        transition: background 0.15s ease, color 0.15s ease;
+        box-shadow: none;
+        transition: background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
       }
-      .browser-switch__btn:hover {
-        color: #ffffff;
-      }
+      /* Inactive: keep label fully white — ring + light fill instead of “washing” the text */
       .browser-switch__btn:not(.browser-switch__btn--active):hover {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+        color: #ffffff;
       }
       .browser-switch__btn:focus-visible {
         outline: 1px solid #ffffff;
@@ -139,8 +140,11 @@
         color: #000000;
         font-weight: 700;
       }
+      /* Selected: keep label fully black — outer glow for hover, no opacity fade */
       .browser-switch__btn--active:hover {
-        opacity: 1;
+        color: #000000;
+        background: #ffffff;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
       }
       .landing-steps {
         list-style: none;
