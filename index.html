@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Digital diet portrait</title>
+    <title>Visualize your Digital Consumption</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -11,6 +11,25 @@
       rel="stylesheet"
     />
     <style>
+      @font-face {
+        font-family: "PP Right Grotesk Mono";
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+        src:
+          local("PP Right Grotesk Mono"),
+          url("fonts/PPRightGroteskMono-Regular.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "PP Right Serif Mono";
+        font-weight: 400;
+        font-style: italic;
+        font-display: swap;
+        src:
+          local("PP Right Serif Mono Italic"),
+          local("PP Right Serif Mono"),
+          url("fonts/PPRightSerifMono-Italic.woff2") format("woff2");
+      }
       * {
         box-sizing: border-box;
       }
@@ -19,7 +38,7 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: #0a0a0a;
+        background: #000000;
       }
       body.portrait-mode {
         overflow: hidden;
@@ -34,75 +53,187 @@
         align-items: flex-start;
         justify-content: center;
         overflow-y: auto;
-        padding: 32px 16px 48px;
-        background: #0a0a0a;
+        -webkit-overflow-scrolling: touch;
+        /* Safe-area + extra room so the title stays below the browser UI / notch */
+        padding-top: max(88px, calc(env(safe-area-inset-top, 0px) + 56px));
+        padding-right: calc(env(safe-area-inset-right, 0px) + 20px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+        padding-left: calc(env(safe-area-inset-left, 0px) + 20px);
+        background: #000000;
         z-index: 2;
       }
       .landing-inner {
-        text-align: left;
-        padding: 8px 0 24px;
-        max-width: 520px;
-        width: 100%;
-      }
-      .landing-note {
-        font-family: "Geist Mono", monospace;
-        font-size: 12px;
-        color: #6f6c66;
-        line-height: 1.5;
-        margin: 0 0 24px;
         text-align: center;
+        padding: 0 0 8px;
+        max-width: 680px;
+        width: 100%;
+        font-family: "PP Right Grotesk Mono", "Geist Mono", ui-monospace, monospace;
+        color: #ffffff;
+        /* Shared width: instruction list, drop zone, and paste block align */
+        --landing-content-max: 440px;
+        --landing-upload-max: var(--landing-content-max);
       }
-      .steps {
-        list-style: none;
-        margin: 0 0 24px;
-        padding: 0;
-        font-family: "Geist Mono", monospace;
+      .landing-title {
+        margin: 0 0 20px;
+        font-family: "PP Right Serif Mono", "Geist Mono", ui-serif, monospace;
+        font-size: clamp(22px, 4.5vw, 30px);
+        font-weight: 400;
+        font-style: italic;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+      }
+      .landing-lede {
+        margin: 0 auto 18px;
+        max-width: 100%;
         font-size: 13px;
-        color: #9a9690;
-        line-height: 1.55;
+        line-height: 1.5;
+        font-weight: 400;
+        color: #ffffff;
       }
-      .steps li {
+      .landing-privacy {
+        margin: 0 auto 28px;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #5ee0d9;
+      }
+      .browser-switch {
         display: flex;
-        gap: 12px;
-        margin-bottom: 18px;
-        align-items: flex-start;
+        width: 100%;
+        max-width: 340px;
+        margin: 0 auto 28px;
+        padding: 4px;
+        border: 1px solid #ffffff;
+        border-radius: 999px;
+        background: #000000;
+        gap: 4px;
       }
-      .steps li:last-child {
+      .browser-switch__btn {
+        flex: 1;
+        margin: 0;
+        padding: 11px 14px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border: none;
+        border-radius: 999px;
+        background: transparent;
+        color: #ffffff;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .browser-switch__btn:hover {
+        color: #ffffff;
+      }
+      .browser-switch__btn:not(.browser-switch__btn--active):hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .browser-switch__btn:focus-visible {
+        outline: 1px solid #ffffff;
+        outline-offset: 2px;
+      }
+      .browser-switch__btn--active {
+        background: #ffffff;
+        color: #000000;
+        font-weight: 700;
+      }
+      .browser-switch__btn--active:hover {
+        opacity: 1;
+      }
+      .landing-steps {
+        list-style: none;
+        margin: 0 auto 28px;
+        padding: 0;
+        max-width: var(--landing-content-max, 440px);
+        text-align: left;
+      }
+      .landing-steps li {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: #ffffff;
+      }
+      .landing-steps li:last-child {
         margin-bottom: 0;
       }
-      .step-num {
+      .landing-step-num {
         flex-shrink: 0;
-        color: #e8e6e3;
-        font-weight: 600;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #ffffff;
+        border-radius: 50%;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+        color: #ffffff;
       }
-      .step-body strong {
-        display: block;
-        color: #e8e6e3;
-        font-weight: 600;
-        margin-bottom: 6px;
+      .landing-step-text {
+        flex: 1;
+        min-width: 0;
+        padding-top: 3px;
       }
-      .steps a {
-        color: #c9a227;
-        text-decoration: none;
-        word-break: break-all;
-      }
-      .steps a:hover {
+      .landing-steps a {
+        color: #ffffff;
         text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .landing-steps a:hover {
+        opacity: 0.85;
       }
       .drop-zone {
         position: relative;
-        min-height: 120px;
-        padding: 20px 16px;
-        border: 1px dashed #3a3834;
-        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 104px;
+        width: 100%;
+        max-width: var(--landing-upload-max, 440px);
+        margin-left: auto;
+        margin-right: auto;
+        padding: 22px 18px 24px;
+        border: 1px dashed rgba(255, 255, 255, 0.85);
+        border-radius: 4px;
         text-align: center;
         cursor: pointer;
-        transition: border-color 0.15s ease, background 0.15s ease;
+        transition:
+          border-color 0.18s ease,
+          border-style 0.18s ease,
+          background 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.18s ease;
       }
-      .drop-zone:hover,
+      .drop-zone:hover {
+        border-color: rgba(255, 255, 255, 1);
+        background: rgba(255, 255, 255, 0.07);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+      }
       .drop-zone.dragover {
+        border-style: solid;
         border-color: #c9a227;
-        background: rgba(201, 162, 39, 0.06);
+        background: rgba(201, 162, 39, 0.14);
+        box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.45), 0 6px 24px rgba(201, 162, 39, 0.12);
+        transform: scale(1.01);
+      }
+      .drop-zone.drop-zone--success {
+        border-style: solid;
+        border-color: #8fd4c8;
+        background: rgba(143, 212, 200, 0.12);
+        box-shadow: 0 0 0 1px rgba(143, 212, 200, 0.4);
+      }
+      .drop-zone.drop-zone--error {
+        border-style: solid;
+        border-color: #e09090;
+        background: rgba(224, 144, 144, 0.1);
+        box-shadow: 0 0 0 1px rgba(224, 144, 144, 0.35);
       }
       .drop-zone input[type="file"] {
         position: absolute;
@@ -111,85 +242,154 @@
         cursor: pointer;
       }
       .drop-zone-title {
-        font-family: "Geist Mono", monospace;
-        font-size: 13px;
-        color: #e8e6e3;
-        margin: 0 0 8px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        color: #ffffff;
+        margin: 0 0 6px;
+        pointer-events: none;
       }
       .drop-zone-hint {
-        font-family: "Geist Mono", monospace;
+        font-family: inherit;
         font-size: 12px;
-        color: #6f6c66;
+        color: rgba(255, 255, 255, 0.72);
         margin: 0;
+        pointer-events: none;
       }
-      .or-divider {
-        font-family: "Geist Mono", monospace;
-        font-size: 12px;
-        color: #6f6c66;
+      .landing-paste-details {
+        width: 100%;
+        max-width: var(--landing-upload-max, 440px);
+        margin: 20px auto 0;
         text-align: center;
-        margin: 20px 0;
-        letter-spacing: 0.06em;
+      }
+      .landing-paste-details summary {
+        list-style: none;
+        list-style-type: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        cursor: pointer;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.38);
+        user-select: none;
+        transition: color 0.15s ease;
+      }
+      .landing-paste-details summary::after {
+        content: "";
+        flex-shrink: 0;
+        width: 5px;
+        height: 5px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(45deg) translateY(-1px);
+        opacity: 0.9;
+        transition: transform 0.2s ease, opacity 0.15s ease;
+      }
+      .landing-paste-details[open] summary::after {
+        transform: rotate(225deg) translateY(1px);
+      }
+      .landing-paste-details summary::-webkit-details-marker {
+        display: none;
+      }
+      .landing-paste-details summary::marker {
+        display: none;
+      }
+      .landing-paste-details summary:hover {
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .landing-paste-details[open] summary {
+        margin-bottom: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .landing-paste-panel {
+        text-align: left;
+        padding-top: 4px;
       }
       .landing-inner textarea {
+        display: block;
         width: 100%;
-        min-height: 100px;
+        max-width: var(--landing-upload-max, 440px);
+        margin-left: auto;
+        margin-right: auto;
+        min-height: 88px;
         resize: vertical;
         padding: 12px 14px;
-        font-family: "Geist Mono", monospace;
-        font-size: 13px;
+        font-family: inherit;
+        font-size: 12px;
         line-height: 1.45;
-        color: #e8e6e3;
-        background: #121211;
-        border: 1px solid #2a2926;
-        border-radius: 6px;
-        margin-bottom: 12px;
+        color: #ffffff;
+        background: #000000;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 4px;
+        margin-bottom: 10px;
       }
       .landing-inner textarea::placeholder {
-        color: #5c5954;
+        color: rgba(255, 255, 255, 0.35);
       }
       .landing-inner textarea:focus {
         outline: none;
-        border-color: #c9a227;
+        border-color: #ffffff;
       }
       .landing-actions {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        margin-top: 20px;
+        gap: 14px;
+        margin-top: 28px;
+        align-items: stretch;
       }
-      .landing-inner button {
-        font-family: "Geist Mono", monospace;
-        font-size: 13px;
-        letter-spacing: 0.04em;
-        padding: 14px 22px;
-        border: 1px solid #2a2926;
+      .landing-inner .btn-secondary {
+        align-self: center;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 10px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
         background: transparent;
-        color: #e8e6e3;
+        color: #ffffff;
         cursor: pointer;
-        border-radius: 2px;
+        border-radius: 4px;
       }
-      .landing-inner button:hover:not(:disabled) {
-        color: #c9a227;
-        border-color: #c9a227;
+      .landing-inner .btn-secondary:hover {
+        border-color: #ffffff;
+        background: rgba(255, 255, 255, 0.06);
       }
-      .landing-inner button:disabled {
-        opacity: 0.45;
+      .landing-inner #start-camera {
+        font-family: inherit;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        padding: 14px 28px;
+        border: 1px solid #ffffff;
+        background: transparent;
+        color: #ffffff;
+        cursor: pointer;
+        border-radius: 6px;
+        width: auto;
+        max-width: 260px;
+        align-self: center;
+        margin: 0 auto;
+      }
+      .landing-inner #start-camera:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .landing-inner #start-camera:disabled {
+        opacity: 0.4;
         cursor: not-allowed;
       }
-      .btn-secondary {
-        align-self: flex-start;
-      }
       #history-status {
-        font-family: "Geist Mono", monospace;
-        font-size: 12px;
+        font-family: inherit;
+        font-size: 11px;
         min-height: 1.25em;
         margin: 0;
+        color: rgba(255, 255, 255, 0.75);
       }
       #history-status.ok {
-        color: #8fb88a;
+        color: #8fd4c8;
       }
       #history-status.err {
-        color: #c97a7a;
+        color: #f0a8a8;
       }
       .visually-hidden {
         position: absolute;
@@ -217,6 +417,7 @@
         font-family: "Geist Mono", monospace;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        --topic-swatch-size: 22px;
       }
       .topic-stats-panel[hidden] {
         display: none !important;
@@ -251,9 +452,12 @@
         min-width: 0;
       }
       .topic-stats-swatch {
-        width: 10px;
-        height: 10px;
-        border-radius: 2px;
+        box-sizing: border-box;
+        width: var(--topic-swatch-size, 22px);
+        height: var(--topic-swatch-size, 22px);
+        min-width: var(--topic-swatch-size, 22px);
+        min-height: var(--topic-swatch-size, 22px);
+        border-radius: 3px;
         flex-shrink: 0;
         border: 1px solid #3a3834;
       }
@@ -261,18 +465,27 @@
         min-width: 0;
       }
       .topic-stats-color {
-        width: 26px;
-        height: 22px;
+        box-sizing: border-box;
+        width: var(--topic-swatch-size, 22px);
+        height: var(--topic-swatch-size, 22px);
+        min-width: var(--topic-swatch-size, 22px);
+        min-height: var(--topic-swatch-size, 22px);
+        max-width: var(--topic-swatch-size, 22px);
+        max-height: var(--topic-swatch-size, 22px);
         padding: 0;
         border: 1px solid #3a3834;
-        border-radius: 4px;
+        border-radius: 3px;
         cursor: pointer;
         flex-shrink: 0;
         background: transparent;
         vertical-align: middle;
+        overflow: hidden;
       }
       .topic-stats-color::-webkit-color-swatch-wrapper {
-        padding: 2px;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
       }
       .topic-stats-color::-webkit-color-swatch {
         border: none;
@@ -324,25 +537,78 @@
       }
       .diet-toggle-row {
         display: flex;
-        align-items: flex-start;
-        gap: 10px;
+        align-items: center;
         margin: 0 0 20px;
       }
-      .diet-toggle-input {
-        margin-top: 2px;
-        width: 17px;
-        height: 17px;
-        accent-color: #c9a227;
+      .diet-switch {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
         cursor: pointer;
-        flex-shrink: 0;
+        user-select: none;
       }
-      .diet-toggle-label {
+      .diet-switch-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+        opacity: 0;
+      }
+      .diet-switch-track {
+        position: relative;
+        flex-shrink: 0;
+        width: 40px;
+        height: 22px;
+        background: #000000;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+        transition:
+          background 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      .diet-switch-thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        transition:
+          transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+          background 0.2s ease;
+        pointer-events: none;
+      }
+      .diet-switch-input:checked + .diet-switch-track {
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+      }
+      .diet-switch-input:checked + .diet-switch-track .diet-switch-thumb {
+        background: #000000;
+        transform: translateX(18px);
+      }
+      .diet-switch-input:focus-visible + .diet-switch-track {
+        outline: 2px solid rgba(255, 255, 255, 0.55);
+        outline-offset: 2px;
+      }
+      .diet-switch-input:checked:focus-visible + .diet-switch-track {
+        outline: 2px solid rgba(0, 0, 0, 0.35);
+        outline-offset: 2px;
+      }
+      .diet-switch-text {
         font-family: "Geist Mono", monospace;
         font-size: 12px;
         line-height: 1.45;
         color: #e8e6e3;
-        cursor: pointer;
-        user-select: none;
+        flex: 1;
+        min-width: 0;
       }
       .diet-slider-block {
         margin-top: 18px;
@@ -375,6 +641,7 @@
         appearance: none;
         background: #2a2926;
         outline: none;
+        accent-color: #e8e6e3;
       }
       .diet-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
@@ -382,20 +649,22 @@
         width: 14px;
         height: 14px;
         border-radius: 50%;
-        background: #c9a227;
+        background: #ffffff;
         cursor: pointer;
-        border: 2px solid #121211;
+        border: 2px solid #2a2926;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
       }
       .diet-slider::-moz-range-thumb {
         width: 14px;
         height: 14px;
         border-radius: 50%;
-        background: #c9a227;
+        background: #ffffff;
         cursor: pointer;
-        border: 2px solid #121211;
+        border: 2px solid #2a2926;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
       }
       .diet-slider:focus-visible {
-        outline: 1px solid #c9a227;
+        outline: 1px solid rgba(255, 255, 255, 0.85);
         outline-offset: 3px;
       }
       .diet-download-footer {
@@ -439,62 +708,110 @@
   <body>
     <div id="landing" class="landing">
       <div class="landing-inner">
-        <p class="landing-note">
-          Tiles use your browsing words plus MediaPipe on a mirrored, letterboxed camera. First run loads WASM + a small model. Open via
-          <code style="color: #9a9690">http://localhost</code>
-          (not <code style="color: #9a9690">file://</code>).
+        <h1 class="landing-title">Visualize your Digital Consumption</h1>
+        <p class="landing-lede">
+          Curious about what your digital consumption says about you? Turn on your camera, upload your browsing history,
+          and watch the words you consumed reshape your face.
         </p>
+        <p class="landing-privacy">*NONE OF YOUR DATA WILL BE COLLECTED*</p>
 
-        <ol class="steps">
+        <div class="browser-switch" role="tablist" aria-label="Choose browser export instructions">
+          <button
+            type="button"
+            class="browser-switch__btn browser-switch__btn--active"
+            id="landing-tab-safari"
+            role="tab"
+            aria-selected="true"
+            aria-controls="landing-steps-safari"
+            data-landing-browser="safari"
+          >
+            Safari
+          </button>
+          <button
+            type="button"
+            class="browser-switch__btn"
+            id="landing-tab-chrome"
+            role="tab"
+            aria-selected="false"
+            aria-controls="landing-steps-chrome"
+            data-landing-browser="chrome"
+          >
+            Google Chrome
+          </button>
+        </div>
+
+        <ol class="landing-steps" id="landing-steps-safari" role="tabpanel" aria-labelledby="landing-tab-safari">
           <li>
-            <span class="step-num" aria-hidden="true">①</span>
-            <div class="step-body">
-              <strong>Install the extension</strong>
+            <span class="landing-step-num" aria-hidden="true">1</span>
+            <span class="landing-step-text">Open <strong>History</strong>.</span>
+          </li>
+          <li>
+            <span class="landing-step-num" aria-hidden="true">2</span>
+            <span class="landing-step-text"
+              >Open <strong>File</strong> and select <strong>Export Browsing Data to File…</strong></span>
+          </li>
+          <li>
+            <span class="landing-step-num" aria-hidden="true">3</span>
+            <span class="landing-step-text">Only toggle <strong>History</strong> on, then export the data.</span>
+          </li>
+          <li>
+            <span class="landing-step-num" aria-hidden="true">4</span>
+            <span class="landing-step-text">Unzip the folder and drop the JSON file here.</span>
+          </li>
+        </ol>
+
+        <ol class="landing-steps" id="landing-steps-chrome" role="tabpanel" aria-labelledby="landing-tab-chrome" hidden>
+          <li>
+            <span class="landing-step-num" aria-hidden="true">1</span>
+            <span class="landing-step-text"
+              >Install the
               <a
                 href="https://chromewebstore.google.com/detail/Export%20Chrome%20History/dihloblpkeiddiaojbagoecedbfpifdj"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Export Chrome History</a
-              >
-              — Chrome Web Store (Chrome / Chromium).
-            </div>
+                >Export Chrome History</a>
+              extension.</span>
           </li>
           <li>
-            <span class="step-num" aria-hidden="true">②</span>
-            <div class="step-body">
-              <strong>Export your last 24 hours</strong>
-              Click the puzzle icon → Export Chrome History → choose <strong>JSON</strong> → time range
-              <strong>Last 24 hours</strong> → download.
-            </div>
+            <span class="landing-step-num" aria-hidden="true">2</span>
+            <span class="landing-step-text">Click the puzzle icon, then open Export Chrome History.</span>
           </li>
           <li>
-            <span class="step-num" aria-hidden="true">③</span>
-            <div class="step-body">
-              <strong>Drop your file here</strong>
-              <span style="color: #6f6c66">(.json or .csv) — or paste text below.</span>
-            </div>
+            <span class="landing-step-num" aria-hidden="true">3</span>
+            <span class="landing-step-text">Choose a time range and download as <strong>JSON</strong>.</span>
+          </li>
+          <li>
+            <span class="landing-step-num" aria-hidden="true">4</span>
+            <span class="landing-step-text">Drop the JSON file here (or use a CSV export).</span>
           </li>
         </ol>
 
         <div class="drop-zone" id="history-drop" role="button" tabindex="0" aria-label="Drop history file here">
-          <input type="file" id="history-file" accept=".json,application/json,.csv,text/csv" />
+          <input
+            type="file"
+            id="history-file"
+            accept=".json,application/json,.csv,text/csv,.txt,text/plain"
+          />
           <p class="drop-zone-title">Drop your file here</p>
-          <p class="drop-zone-hint">.json or .csv accepted</p>
+          <p class="drop-zone-hint">.JSON or .CSV accepted</p>
         </div>
 
-        <div class="or-divider">— or —</div>
-
-        <label for="history-paste" class="visually-hidden">Paste text</label>
-        <textarea
-          id="history-paste"
-          placeholder="Paste anything you read today instead"
-          spellcheck="false"
-        ></textarea>
-        <button type="button" class="btn-secondary" id="use-paste">Use pasted text</button>
+        <details class="landing-paste-details">
+          <summary>Or paste text manually</summary>
+          <div class="landing-paste-panel">
+            <label for="history-paste" class="visually-hidden">Paste browsing text</label>
+            <textarea
+              id="history-paste"
+              placeholder="Paste copied history or any text you read today"
+              spellcheck="false"
+            ></textarea>
+            <button type="button" class="btn-secondary" id="use-paste">Use pasted text</button>
+          </div>
+        </details>
 
         <div class="landing-actions">
           <p id="history-status" aria-live="polite"></p>
-          <button type="button" id="start-camera" disabled>Start camera</button>
+          <button type="button" id="start-camera" disabled>Start Camera</button>
         </div>
       </div>
     </div>
@@ -505,12 +822,18 @@
         the tiles look.
       </p>
       <div class="diet-toggle-row">
-        <input type="checkbox" id="continuous-shuffle" class="diet-toggle-input" />
-        <label for="continuous-shuffle" class="diet-toggle-label">Continuous shuffle</label>
+        <label class="diet-switch">
+          <input type="checkbox" id="continuous-shuffle" class="diet-switch-input" />
+          <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
+          <span class="diet-switch-text">Shuffle</span>
+        </label>
       </div>
       <div class="diet-toggle-row">
-        <input type="checkbox" id="invert-person-tiles" class="diet-toggle-input" />
-        <label for="invert-person-tiles" class="diet-toggle-label">Invert</label>
+        <label class="diet-switch">
+          <input type="checkbox" id="invert-person-tiles" class="diet-switch-input" />
+          <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
+          <span class="diet-switch-text">Invert</span>
+        </label>
       </div>
       <div class="diet-slider-block">
         <label class="diet-slider-label" for="tile-brightness"

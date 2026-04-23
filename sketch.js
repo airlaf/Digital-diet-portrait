@@ -530,7 +530,7 @@ function parseHistoryJsonText(text) {
 function applyImportedWordFreq(freq, label) {
   if (!freq || !Object.keys(freq).length) {
     setHistoryStatus("No words found in that file. Try JSON from the extension or a different export.", "err");
-    return;
+    return false;
   }
   tileWordFreq = freq;
   const n = Object.keys(freq).length;
@@ -545,16 +545,21 @@ function applyImportedWordFreq(freq, label) {
     updateTopicStatsPanel();
     buildLayout();
   }
+  return true;
 }
 
+/**
+ * @returns {Promise<boolean>} true when history was applied and Start camera can proceed
+ */
 async function handleHistoryFile(file) {
-  if (!file) return;
+  if (!file) return false;
   const name = (file.name || "").toLowerCase();
   const isJson = name.endsWith(".json") || file.type === "application/json";
   const isCsv = name.endsWith(".csv") || file.type === "text/csv" || file.type === "application/vnd.ms-excel";
-  if (!isJson && !isCsv) {
-    setHistoryStatus("Please upload a .json or .csv export.", "err");
-    return;
+  const isTxt = name.endsWith(".txt") || file.type === "text/plain";
+  if (!isJson && !isCsv && !isTxt) {
+    setHistoryStatus("Please upload a .json, .csv, or .txt file.", "err");
+    return false;
   }
   try {
     const text = await new Promise((resolve, reject) => {
@@ -565,14 +570,17 @@ async function handleHistoryFile(file) {
     });
     /** @type {Record<string, number>} */
     let freq;
-    if (isJson) {
+    if (isTxt) {
+      freq = wordFreqFromPlainText(text);
+    } else if (isJson) {
       freq = parseHistoryJsonText(text);
     } else {
       freq = parseHistoryCsv(text);
     }
-    applyImportedWordFreq(freq, `Loaded ${file.name}`);
+    return applyImportedWordFreq(freq, `Loaded ${file.name}`);
   } catch (e) {
-    setHistoryStatus("Could not read that file. Check that it is valid JSON or CSV.", "err");
+    setHistoryStatus("Could not read that file. Check that it is valid JSON, CSV, or plain text.", "err");
+    return false;
   }
 }
 
@@ -597,13 +605,24 @@ function wireHistoryLanding() {
         drop.classList.remove("dragover");
       });
     });
+    /** @param {boolean} ok */
+    const flashDropZone = (ok) => {
+      drop.classList.remove("drop-zone--success", "drop-zone--error");
+      void drop.offsetWidth;
+      drop.classList.add(ok ? "drop-zone--success" : "drop-zone--error");
+      window.setTimeout(() => {
+        drop.classList.remove("drop-zone--success", "drop-zone--error");
+      }, ok ? 900 : 650);
+    };
     drop.addEventListener("drop", (e) => {
       const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (f) void handleHistoryFile(f);
+      if (f) {
+        void handleHistoryFile(f).then((ok) => flashDropZone(!!ok));
+      }
     });
     input.addEventListener("change", () => {
       const f = input.files && input.files[0];
-      if (f) void handleHistoryFile(f);
+      if (f) void handleHistoryFile(f).then((ok) => flashDropZone(!!ok));
       input.value = "";
     });
     drop.addEventListener("keydown", (e) => {
@@ -625,7 +644,31 @@ function wireHistoryLanding() {
     });
   }
 
+  wireLandingBrowserTabs();
+
   updateStartCameraEnabled();
+}
+
+function wireLandingBrowserTabs() {
+  const tabSafari = document.getElementById("landing-tab-safari");
+  const tabChrome = document.getElementById("landing-tab-chrome");
+  const stepsSafari = document.getElementById("landing-steps-safari");
+  const stepsChrome = document.getElementById("landing-steps-chrome");
+  if (!tabSafari || !tabChrome || !stepsSafari || !stepsChrome) return;
+
+  const setMode = (mode) => {
+    const safari = mode === "safari";
+    tabSafari.classList.toggle("browser-switch__btn--active", safari);
+    tabSafari.setAttribute("aria-selected", safari ? "true" : "false");
+    tabChrome.classList.toggle("browser-switch__btn--active", !safari);
+    tabChrome.setAttribute("aria-selected", safari ? "false" : "true");
+    stepsSafari.hidden = !safari;
+    stepsChrome.hidden = safari;
+  };
+
+  tabSafari.addEventListener("click", () => setMode("safari"));
+  tabChrome.addEventListener("click", () => setMode("chrome"));
+  setMode("safari");
 }
 
 const HAVE_METADATA = typeof HTMLMediaElement !== "undefined" ? HTMLMediaElement.HAVE_METADATA : 1;
