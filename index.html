@@ -44,8 +44,197 @@
       body.portrait-mode {
         overflow: hidden;
       }
+      /* Narrow: document scroll (camera + controls taller than viewport) */
+      @media (max-width: 900px) {
+        html,
+        body.portrait-mode {
+          height: auto;
+          min-height: 100%;
+        }
+        html.portrait-stacked-scroll {
+          overflow-x: hidden;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior-y: contain;
+          min-height: 100dvh;
+        }
+        html.portrait-stacked-scroll body.portrait-mode {
+          overflow-x: hidden;
+          overflow-y: visible;
+          min-height: 100dvh;
+        }
+      }
       body.portrait-mode canvas {
         display: block;
+      }
+      #portrait-root[hidden] {
+        display: none !important;
+      }
+      #portrait-root {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+      #portrait-root .portrait-controls {
+        pointer-events: auto;
+      }
+      .portrait-canvas-host {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .portrait-canvas-host canvas {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+      .portrait-controls {
+        display: block;
+      }
+      .diet-left-column {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        bottom: 16px;
+        width: 220px;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        box-sizing: border-box;
+        padding: 20px 14px 16px;
+        border-radius: 10px;
+        background: rgba(10, 10, 10, 0.94);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        pointer-events: auto;
+      }
+      @media (min-width: 901px) {
+        .diet-left-column #diet-title-panel {
+          position: static;
+          top: auto;
+          left: auto;
+          right: auto;
+          bottom: auto;
+          width: 100%;
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          padding: 0;
+          margin: 0;
+          background: transparent;
+          box-shadow: none;
+          border-radius: 0;
+        }
+        .diet-left-column .diet-download-aside {
+          position: static;
+          flex: 0 0 auto;
+          width: 100%;
+          margin: 0;
+          margin-top: 12px;
+          padding: 16px 0 0;
+          border-top: 1px solid rgba(42, 41, 38, 0.9);
+          background: transparent;
+          box-shadow: none;
+          border-radius: 0;
+        }
+      }
+      .diet-download-aside {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        box-sizing: border-box;
+      }
+      .diet-download-aside[hidden] {
+        display: none !important;
+      }
+      @media (max-width: 900px) {
+        #portrait-root {
+          position: relative;
+          inset: auto;
+          min-height: 100dvh;
+          display: flex;
+          flex-direction: column;
+          pointer-events: auto;
+        }
+        .portrait-canvas-host {
+          position: relative;
+          inset: auto;
+          width: 100%;
+          flex: 0 0 auto;
+          min-height: 160px;
+          overflow: hidden;
+        }
+        .portrait-canvas-host canvas {
+          width: 100%;
+          height: auto;
+          vertical-align: top;
+        }
+        .portrait-controls {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "diet"
+            "topic"
+            "download";
+          gap: 16px;
+          padding: 16px 16px max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+          width: 100%;
+          flex: 0 0 auto;
+        }
+        .diet-left-column {
+          display: contents;
+          position: static;
+          width: auto;
+          height: auto;
+          top: auto;
+          left: auto;
+          bottom: auto;
+          padding: 0;
+          margin: 0;
+          background: transparent;
+          box-shadow: none;
+          border-radius: 0;
+        }
+        #diet-title-panel {
+          grid-area: diet;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100%;
+          top: auto !important;
+          left: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          flex: none;
+          min-height: 0;
+          max-height: none;
+        }
+        #topic-stats-panel {
+          grid-area: topic;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100%;
+          top: auto !important;
+          left: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          max-height: none;
+        }
+        .diet-download-aside {
+          grid-area: download;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100%;
+          margin: 0;
+          padding: 20px 14px 22px;
+          border-radius: 10px;
+          background: rgba(10, 10, 10, 0.94);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+          border-top: none;
+        }
       }
       .landing {
         position: fixed;
@@ -673,10 +862,6 @@
         outline: 1px solid rgba(255, 255, 255, 0.85);
         outline-offset: 3px;
       }
-      .diet-download-footer {
-        margin-top: auto;
-        padding-top: 22px;
-      }
       .diet-download-heading {
         margin: 0 0 10px;
         font-size: 10px;
@@ -821,64 +1006,71 @@
         </div>
       </div>
     </div>
-    <aside id="diet-title-panel" class="diet-title-panel" hidden aria-label="Title and layout controls">
-      <h1 class="diet-title-heading">Your Digital Diet</h1>
-      <p class="diet-title-desc">
-        Your browsing words form a live mosaic on the camera. Shuffle them, choose body or background, and tune how
-        the tiles look.
-      </p>
-      <div class="diet-toggle-row">
-        <label class="diet-switch">
-          <input type="checkbox" id="continuous-shuffle" class="diet-switch-input" />
-          <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
-          <span class="diet-switch-text">Shuffle</span>
-        </label>
-      </div>
-      <div class="diet-toggle-row">
-        <label class="diet-switch">
-          <input type="checkbox" id="invert-person-tiles" class="diet-switch-input" />
-          <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
-          <span class="diet-switch-text">Invert</span>
-        </label>
-      </div>
-      <div class="diet-slider-block">
-        <label class="diet-slider-label" for="tile-brightness"
-          >Brightness <span class="diet-slider-value" id="tile-brightness-value">100%</span></label
-        >
-        <input type="range" id="tile-brightness" class="diet-slider" min="0" max="200" value="100" step="1" />
-      </div>
-      <div class="diet-slider-block">
-        <label class="diet-slider-label" for="tile-saturation"
-          >Saturation <span class="diet-slider-value" id="tile-saturation-value">150%</span></label
-        >
-        <input
-          type="range"
-          id="tile-saturation"
-          class="diet-slider"
-          min="0"
-          max="220"
-          value="150"
-          step="1"
-        />
-      </div>
-      <div class="diet-slider-block">
-        <label class="diet-slider-label" for="tile-text-size"
-          >Text size <span class="diet-slider-value" id="tile-text-size-value">12px</span></label
-        >
-        <input type="range" id="tile-text-size" class="diet-slider" min="8" max="28" value="12" step="1" />
-      </div>
-      <div class="diet-download-footer">
-        <p class="diet-download-heading">Download</p>
-        <div class="diet-download-row">
-          <button type="button" class="diet-download-btn" id="download-png" disabled>PNG</button>
-          <button type="button" class="diet-download-btn" id="download-svg" disabled>SVG</button>
+    <div id="portrait-root" hidden>
+      <div id="portrait-canvas-host" class="portrait-canvas-host"></div>
+      <div class="portrait-controls">
+        <div class="diet-left-column">
+          <aside id="diet-title-panel" class="diet-title-panel" hidden aria-label="Title and layout controls">
+            <h1 class="diet-title-heading">Your Digital Diet</h1>
+            <p class="diet-title-desc">
+              Your browsing words form a live mosaic on the camera. Shuffle them, choose body or background, and tune
+              how the tiles look.
+            </p>
+            <div class="diet-toggle-row">
+              <label class="diet-switch">
+                <input type="checkbox" id="continuous-shuffle" class="diet-switch-input" />
+                <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
+                <span class="diet-switch-text">Shuffle</span>
+              </label>
+            </div>
+            <div class="diet-toggle-row">
+              <label class="diet-switch">
+                <input type="checkbox" id="invert-person-tiles" class="diet-switch-input" />
+                <span class="diet-switch-track" aria-hidden="true"><span class="diet-switch-thumb"></span></span>
+                <span class="diet-switch-text">Invert</span>
+              </label>
+            </div>
+            <div class="diet-slider-block">
+              <label class="diet-slider-label" for="tile-brightness"
+                >Brightness <span class="diet-slider-value" id="tile-brightness-value">100%</span></label
+              >
+              <input type="range" id="tile-brightness" class="diet-slider" min="0" max="200" value="100" step="1" />
+            </div>
+            <div class="diet-slider-block">
+              <label class="diet-slider-label" for="tile-saturation"
+                >Saturation <span class="diet-slider-value" id="tile-saturation-value">150%</span></label
+              >
+              <input
+                type="range"
+                id="tile-saturation"
+                class="diet-slider"
+                min="0"
+                max="220"
+                value="150"
+                step="1"
+              />
+            </div>
+            <div class="diet-slider-block">
+              <label class="diet-slider-label" for="tile-text-size"
+                >Text size <span class="diet-slider-value" id="tile-text-size-value">12px</span></label
+              >
+              <input type="range" id="tile-text-size" class="diet-slider" min="8" max="28" value="12" step="1" />
+            </div>
+          </aside>
+          <aside id="diet-download-aside" class="diet-download-aside" hidden aria-label="Export portrait">
+            <p class="diet-download-heading">Download</p>
+            <div class="diet-download-row">
+              <button type="button" class="diet-download-btn" id="download-png" disabled>PNG</button>
+              <button type="button" class="diet-download-btn" id="download-svg" disabled>SVG</button>
+            </div>
+          </aside>
         </div>
+        <aside id="topic-stats-panel" class="topic-stats-panel" hidden aria-label="Word counts by topic">
+          <h2 class="topic-stats-heading">Topic categories</h2>
+          <div class="topic-stats-rows" id="topic-stats-rows"></div>
+        </aside>
       </div>
-    </aside>
-    <aside id="topic-stats-panel" class="topic-stats-panel" hidden aria-label="Word counts by topic">
-      <h2 class="topic-stats-heading">Topic categories</h2>
-      <div class="topic-stats-rows" id="topic-stats-rows"></div>
-    </aside>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/compromise@14.14.0/builds/compromise.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
     <script src="sketch.js"></script>

@@ -906,6 +906,59 @@ const TOPIC_STATS_PANEL_EDGE_INSET = 16;
 /** Width reserved on each side for floating panels + margin (match `index.html`). */
 const LIVE_SIDE_PANEL_RESERVE = TOPIC_STATS_PANEL_W + TOPIC_STATS_PANEL_EDGE_INSET;
 
+/** Stacked controls under the camera; must match `index.html` `(max-width: …px)`. */
+const PORTRAIT_STACKED_MAX_CSS_PX = 900;
+
+function isPortraitStackedLayout() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(`(max-width: ${PORTRAIT_STACKED_MAX_CSS_PX}px)`).matches;
+}
+
+function getLiveSideInsets() {
+  if (!live) return { left: 0, right: 0 };
+  if (isPortraitStackedLayout()) return { left: 0, right: 0 };
+  return { left: LIVE_SIDE_PANEL_RESERVE, right: LIVE_SIDE_PANEL_RESERVE };
+}
+
+function liveCanvasWidthHeight() {
+  if (!live) return [Math.max(320, windowWidth), Math.max(240, windowHeight)];
+  if (!isPortraitStackedLayout()) return [Math.max(320, windowWidth), Math.max(240, windowHeight)];
+  const wInner = window.innerWidth > 0 ? window.innerWidth : windowWidth;
+  const wpx = Math.floor(Math.max(280, wInner));
+  const innerH = window.innerHeight > 0 ? window.innerHeight : windowHeight;
+  const cap = capture && capture.elt;
+  let hpx;
+  if (cap && cap.videoWidth > 0 && cap.videoHeight > 0) {
+    const vw = cap.videoWidth;
+    const vh = cap.videoHeight;
+    const byAspect = Math.floor((wpx * vh) / vw);
+    const maxCh = Math.floor(innerH * 0.58);
+    hpx = Math.min(byAspect, maxCh);
+    hpx = Math.max(hpx, Math.min(220, Math.floor(innerH * 0.28)));
+  } else {
+    hpx = Math.floor(innerH * 0.42);
+  }
+  return [wpx, Math.max(200, hpx)];
+}
+
+function applyLiveCanvasSize() {
+  pixelDensity(1);
+  const wh = liveCanvasWidthHeight();
+  resizeCanvas(wh[0], wh[1]);
+}
+
+/** Lets the document scroll on narrow stacked layout (`overflow` on `html` is unlocked in CSS). */
+function syncPortraitDocumentScrollClass() {
+  const rootEl = document.documentElement;
+  if (!rootEl) return;
+  if (!live) {
+    rootEl.classList.remove("portrait-stacked-scroll");
+    return;
+  }
+  if (isPortraitStackedLayout()) rootEl.classList.add("portrait-stacked-scroll");
+  else rootEl.classList.remove("portrait-stacked-scroll");
+}
+
 const TOPIC_STATS_ORDER = [
   TOPIC_IDS.POLITICS,
   TOPIC_IDS.CULTURE,
@@ -3527,6 +3580,8 @@ const LAYOUT_TEXT_WEIGHT = 500;
 
 let live = false;
 let capture;
+/** @type {p5.Renderer | null} */
+let portraitP5Renderer = null;
 let comp;
 let layout = [];
 let lastVw = 0;
@@ -3765,7 +3820,8 @@ function maybeRequestSegmentation() {
   if (frameCount % SEGMENT_EVERY_N_FRAMES !== 0) return;
   const sc = ensureSegWorkCanvas(width, height);
   const ctx = sc.getContext("2d");
-  drawLetterboxedMirrorVideoToCtx(ctx, capture.elt, width, height, LIVE_SIDE_PANEL_RESERVE, LIVE_SIDE_PANEL_RESERVE);
+  const segInsets = getLiveSideInsets();
+  drawLetterboxedMirrorVideoToCtx(ctx, capture.elt, width, height, segInsets.left, segInsets.right);
   segmentInFlight = true;
   segVideoTimestamp += 1;
   Promise.resolve()
@@ -3957,14 +4013,8 @@ function buildLayout() {
   const g = comp;
   g.textAlign(LEFT, BASELINE);
 
-  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(
-    vw,
-    vh,
-    width,
-    height,
-    LIVE_SIDE_PANEL_RESERVE,
-    LIVE_SIDE_PANEL_RESERVE,
-  );
+  const layoutInsets = getLiveSideInsets();
+  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(vw, vh, width, height, layoutInsets.left, layoutInsets.right);
   const box = {
     minX: ox + TEXT_INSET,
     minY: oy + TEXT_INSET,
@@ -4057,10 +4107,16 @@ function startLive() {
 
   const dietPanel = document.getElementById("diet-title-panel");
   if (dietPanel) dietPanel.hidden = false;
+  const dlAside = document.getElementById("diet-download-aside");
+  if (dlAside) dlAside.hidden = false;
+  const portraitRoot = document.getElementById("portrait-root");
+  if (portraitRoot) portraitRoot.hidden = false;
+  const host = document.getElementById("portrait-canvas-host");
+  if (portraitP5Renderer && host) portraitP5Renderer.parent(host);
   setDownloadButtonsEnabled(true);
 
-  pixelDensity(1);
-  resizeCanvas(windowWidth, windowHeight);
+  applyLiveCanvasSize();
+  syncPortraitDocumentScrollClass();
   textFont("monospace");
   textAlign(LEFT, BASELINE);
   updateTopicStatsPanel();
@@ -4074,7 +4130,10 @@ function startLive() {
     v.setAttribute("playsinline", "true");
     v.playsInline = true;
     const play = () => v.play().catch(() => {});
-    const rebuild = () => buildLayout();
+    const rebuild = () => {
+      applyLiveCanvasSize();
+      buildLayout();
+    };
     v.addEventListener("loadeddata", play, { once: true });
     v.addEventListener("canplay", play, { once: true });
     v.addEventListener("loadeddata", rebuild, { once: true });
@@ -4083,7 +4142,10 @@ function startLive() {
     /* camera blocked */
   }
 
-  setTimeout(buildLayout, 400);
+  setTimeout(() => {
+    applyLiveCanvasSize();
+    buildLayout();
+  }, 400);
 
   loadMediaPipeSegmenter();
 
@@ -4103,13 +4165,15 @@ function startLive() {
     } catch (e) {
       textFont("monospace");
     }
+    applyLiveCanvasSize();
     buildLayout();
+    syncPortraitDocumentScrollClass();
   })();
 }
 
 function setup() {
   pixelDensity(1);
-  createCanvas(windowWidth, windowHeight);
+  portraitP5Renderer = createCanvas(windowWidth, windowHeight);
   wireHistoryLanding();
   const btn = document.getElementById("start-camera");
   if (btn) btn.addEventListener("click", startLive);
@@ -4121,12 +4185,24 @@ function setup() {
   if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
   if (dlSvg) dlSvg.addEventListener("click", downloadPortraitSvg);
   wireTileAppearanceSliders();
+  if (typeof window !== "undefined" && window.matchMedia) {
+    const mq = window.matchMedia(`(max-width: ${PORTRAIT_STACKED_MAX_CSS_PX}px)`);
+    const onStackedMq = () => {
+      if (!live) return;
+      syncPortraitDocumentScrollClass();
+      applyLiveCanvasSize();
+      buildLayout();
+    };
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", onStackedMq);
+    else if (typeof mq.addListener === "function") mq.addListener(onStackedMq);
+  }
 }
 
 function windowResized() {
   pixelDensity(1);
   if (live) {
-    resizeCanvas(windowWidth, windowHeight);
+    syncPortraitDocumentScrollClass();
+    applyLiveCanvasSize();
     buildLayout();
   } else {
     resizeCanvas(windowWidth, windowHeight);
@@ -4152,6 +4228,7 @@ function draw() {
   const vh = capture.elt.videoHeight;
   if (vw !== lastVw || vh !== lastVh) {
     lastPersonSegmentation = null;
+    applyLiveCanvasSize();
     buildLayout();
   }
   if (layout.length === 0) buildLayout();
@@ -4160,14 +4237,8 @@ function draw() {
 
   ensureComp();
 
-  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(
-    vw,
-    vh,
-    width,
-    height,
-    LIVE_SIDE_PANEL_RESERVE,
-    LIVE_SIDE_PANEL_RESERVE,
-  );
+  const drawInsets = getLiveSideInsets();
+  const { ox, oy, dw, dh } = letterboxRectWithSideInsets(vw, vh, width, height, drawInsets.left, drawInsets.right);
   comp.background(0);
   comp.push();
   comp.translate(ox + dw, oy);
