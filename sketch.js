@@ -115,6 +115,82 @@ const NOISE_WORDS = new Set([
   "amp",
 ]);
 
+/**
+ * Browser / product UI vocabulary stripped before word counts (and thus before topic rules).
+ * Separate from {@link NOISE_WORDS} (general English + URL-ish stoplist).
+ */
+const BROWSER_NOISE = new Set([
+  // Browsers & search
+  "google",
+  "chrome",
+  "safari",
+  "firefox",
+  "mozilla",
+  "bing",
+  "yahoo",
+  "duckduckgo",
+  "search",
+  "results",
+  "query",
+  "cached",
+
+  // Dev/tech infrastructure that isn't meaningful consumption
+  "github",
+  "stackoverflow",
+  "localhost",
+  "figma",
+  "notion",
+  "linear",
+  "jira",
+  "vercel",
+  "netlify",
+  "heroku",
+  "aws",
+  "console",
+  "dashboard",
+  "settings",
+  "profile",
+  "account",
+  "signin",
+  "signup",
+  "logout",
+  "redirect",
+  "callback",
+
+  // Generic web words
+  "website",
+  "webpage",
+  "browser",
+  "internet",
+  "online",
+  "click",
+  "download",
+  "upload",
+  "install",
+  "extension",
+  "plugin",
+  "widget",
+  "popup",
+  "modal",
+
+  // Common site UI words that leak through
+  "home",
+  "feed",
+  "explore",
+  "discover",
+  "trending",
+  "following",
+  "followers",
+  "likes",
+  "share",
+  "comment",
+  "reply",
+  "repost",
+  "bookmark",
+  "saved",
+  "archive",
+]);
+
 /** Letters treated as vowels for gibberish heuristics (includes y for rhythm, glyph, etc.). */
 const VOWEL_CHARS = new Set("aeiouy");
 
@@ -308,6 +384,7 @@ function isAcceptableWordToken(w) {
   if (!w || w.length < 3 || w.length > 20) return false;
   if (!/^[a-z]+$/.test(w)) return false;
   if (NOISE_WORDS.has(w)) return false;
+  if (BROWSER_NOISE.has(w)) return false;
 
   let vowels = 0;
   for (let i = 0; i < w.length; i++) {
