@@ -4002,6 +4002,22 @@ function wireTileAppearanceSliders() {
   syncTileSliderLabels();
 }
 
+/**
+ * Fisher–Yates shuffle of `[word, count]` rows (returns a new array).
+ * @param {[string, number][]} rows
+ * @returns {[string, number][]}
+ */
+function shuffleWordEntryPairs(rows) {
+  const out = rows.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = out[i];
+    out[i] = out[j];
+    out[j] = t;
+  }
+  return out;
+}
+
 function buildLayout() {
   layout = [];
   if (!live || !capture || !capture.elt) return;
@@ -4028,16 +4044,13 @@ function buildLayout() {
 
   const wordMap =
     tileWordFreq && Object.keys(tileWordFreq).length ? tileWordFreq : DEFAULT_TILE_WORDS;
-  const sorted = Object.entries(wordMap).sort((a, b) => a[0].localeCompare(b[0]));
-  let entries = sorted;
+  const usingDefaultWords = !tileWordFreq || !Object.keys(tileWordFreq).length;
+  const rawPairs = Object.entries(wordMap);
+  let entries = usingDefaultWords
+    ? shuffleWordEntryPairs(rawPairs)
+    : rawPairs.slice().sort((a, b) => a[0].localeCompare(b[0]));
   if (continuousShuffleOn) {
-    entries = sorted.slice();
-    for (let i = entries.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = entries[i];
-      entries[i] = entries[j];
-      entries[j] = t;
-    }
+    entries = shuffleWordEntryPairs(entries);
   }
 
   applyGeistWeight(g, LAYOUT_TEXT_WEIGHT, tileFontSizePx);
