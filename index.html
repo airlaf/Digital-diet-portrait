@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Visualize your Digital Consumption</title>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -126,10 +126,10 @@
         box-shadow: none;
         transition: background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
       }
-      /* Inactive: keep label fully white — ring + light fill instead of “washing” the text */
+      /* Inactive: light fill only — no ring (ring reserved for selected tab hover) */
       .browser-switch__btn:not(.browser-switch__btn--active):hover {
         background: rgba(255, 255, 255, 0.06);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+        box-shadow: none;
         color: #ffffff;
       }
       .browser-switch__btn:focus-visible {
@@ -140,6 +140,7 @@
         background: #ffffff;
         color: #000000;
         font-weight: 700;
+        box-shadow: none;
       }
       /* Selected: keep label fully black — outer glow for hover, no opacity fade */
       .browser-switch__btn--active:hover {
