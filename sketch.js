@@ -486,6 +486,72 @@ function tokenizeWords(text) {
   return out;
 }
 
+/** Cap text length sent to Compromise so very large imports stay responsive. */
+const COMPROMISE_TEXT_MAX_CHARS = 400000;
+
+/**
+ * Meaningful lexical tokens for frequency counting using Compromise.js (POS filter + lemma),
+ * then {@link isAcceptableWordToken}. Falls back to {@link tokenizeWords} if `nlp` is missing or yields nothing.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function meaningfulTokensFromText(text) {
+  const raw = String(text || "");
+  if (typeof nlp !== "function") {
+    return tokenizeWords(raw);
+  }
+
+  let slice = raw;
+  if (slice.length > COMPROMISE_TEXT_MAX_CHARS) {
+    slice = slice.slice(-COMPROMISE_TEXT_MAX_CHARS);
+  }
+
+  let doc;
+  try {
+    doc = nlp(slice);
+  } catch (e) {
+    return tokenizeWords(raw);
+  }
+
+  const out = [];
+  doc.terms().forEach((term) => {
+    if (term.has("#Pronoun")) return;
+    if (term.has("#Determiner")) return;
+    if (term.has("#Conjunction")) return;
+    if (term.has("#Preposition")) return;
+    if (term.has("#Copula")) return;
+    if (term.has("#Modal")) return;
+    if (term.has("#Possessive")) return;
+    if (term.has("#QuestionWord")) return;
+
+    if (!term.has("#Noun") && !term.has("#Verb") && !term.has("#Adjective") && !term.has("#Adverb")) return;
+
+    let w = "";
+    try {
+      w = String(term.text("root") || "").toLowerCase().replace(/[^a-z]/g, "");
+    } catch (e) {
+      w = "";
+    }
+    if (!w || w.length < 3) {
+      try {
+        w = String(term.text("normal") || "").toLowerCase().replace(/[^a-z]/g, "");
+      } catch (e2) {
+        w = String(term.text() || "")
+          .toLowerCase()
+          .replace(/[^a-z]/g, "");
+      }
+    }
+    if (!w || w.length < 3) return;
+    if (!isAcceptableWordToken(w)) return;
+    out.push(w);
+  });
+
+  if (out.length === 0 && raw.replace(/\s/g, "").length > 0) {
+    return tokenizeWords(raw);
+  }
+  return out;
+}
+
 function freqFromTokens(tokens) {
   /** @type {Record<string, number>} */
   const f = Object.create(null);
@@ -505,7 +571,7 @@ function mergeFreq(a, b) {
 }
 
 function wordFreqFromPlainText(text) {
-  return freqFromTokens(tokenizeWords(text));
+  return freqFromTokens(meaningfulTokensFromText(text));
 }
 
 function parseCsvLine(line) {
@@ -973,7 +1039,7 @@ function topicRule(id, exact, stems) {
   return { id, exact: new Set(exact.map((w) => w.toLowerCase())), stems: stems.map((s) => s.toLowerCase()) };
 }
 
-/** First matching rule wins (order = specificity / your grouping intent). */
+/** Category lexicons; assignment uses {@link scoreWordAgainstRule} + confidence/margin in {@link topicForWord}. */
 const TOPIC_RULES = [
   topicRule(TOPIC_IDS.POLITICS, [
     "senate",
@@ -3399,25 +3465,61 @@ const TOPIC_RULES = [
   ]),
 ];
 
+/** Lexicon exact hit — strong signal, no margin vs runner-up required. */
+const TOPIC_SCORE_EXACT = 100;
+/** Minimum score to assign a topic (keeps weak substring hits in OTHER). */
+const TOPIC_CONFIDENCE_MIN = 32;
 /**
+ * Stem / fuzzy winner must beat the next-best topic by at least this (ties → OTHER).
+ * Skipped when the best score is an exact hit.
+ */
+const TOPIC_WIN_MARGIN = 2;
+
+/**
+ * @param {string} w lowercased a–z word
+ * @param {{ id: string, exact: Set<string>, stems: string[] }} rule
+ * @returns {number}
+ */
+function scoreWordAgainstRule(w, rule) {
+  if (rule.exact.has(w)) return TOPIC_SCORE_EXACT;
+  let best = 0;
+  for (let s = 0; s < rule.stems.length; s++) {
+    const stem = rule.stems[s];
+    if (!stem) continue;
+    if (stem.length <= 3) {
+      if (w === stem) best = Math.max(best, 52);
+    } else if (w.includes(stem)) {
+      best = Math.max(best, 28 + Math.min(stem.length, 16));
+    }
+  }
+  return best;
+}
+
+/**
+ * Pick a topic by scoring every rule and taking the winner only if it clears confidence + margin.
  * @param {string} raw
  */
 function topicForWord(raw) {
   const w = String(raw || "").toLowerCase();
   if (!w) return TOPIC_IDS.OTHER;
+
+  /** @type {{ id: string; sc: number }[]} */
+  const scored = [];
   for (let r = 0; r < TOPIC_RULES.length; r++) {
     const rule = TOPIC_RULES[r];
-    if (rule.exact.has(w)) return rule.id;
-    for (let s = 0; s < rule.stems.length; s++) {
-      const stem = rule.stems[s];
-      if (stem.length <= 3) {
-        if (w === stem) return rule.id;
-      } else if (w.includes(stem)) {
-        return rule.id;
-      }
-    }
+    const sc = scoreWordAgainstRule(w, rule);
+    if (sc > 0) scored.push({ id: rule.id, sc });
   }
-  return TOPIC_IDS.OTHER;
+  if (!scored.length) return TOPIC_IDS.OTHER;
+
+  scored.sort((a, b) => b.sc - a.sc);
+  const top = scored[0];
+  const second = scored.length > 1 ? scored[1] : null;
+
+  if (top.sc < TOPIC_CONFIDENCE_MIN) return TOPIC_IDS.OTHER;
+  if (top.sc >= TOPIC_SCORE_EXACT) return top.id;
+  if (second && top.sc - second.sc < TOPIC_WIN_MARGIN) return TOPIC_IDS.OTHER;
+  return top.id;
 }
 
 /** Mosaic tile font weight. */
