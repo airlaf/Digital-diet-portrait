@@ -4044,14 +4044,8 @@ function buildLayout() {
 
   const wordMap =
     tileWordFreq && Object.keys(tileWordFreq).length ? tileWordFreq : DEFAULT_TILE_WORDS;
-  const usingDefaultWords = !tileWordFreq || !Object.keys(tileWordFreq).length;
-  const rawPairs = Object.entries(wordMap);
-  let entries = usingDefaultWords
-    ? shuffleWordEntryPairs(rawPairs)
-    : rawPairs.slice().sort((a, b) => a[0].localeCompare(b[0]));
-  if (continuousShuffleOn) {
-    entries = shuffleWordEntryPairs(entries);
-  }
+  /** Random order (never A–Z); shuffle toggle only adds periodic re-layout in {@link maybeContinuousShuffleFromDraw}. */
+  const entries = shuffleWordEntryPairs(Object.entries(wordMap));
 
   applyGeistWeight(g, LAYOUT_TEXT_WEIGHT, tileFontSizePx);
 
