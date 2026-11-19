@@ -9,29 +9,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=Hedvig+Letters+Serif:opsz@12..24&display=swap"
       rel="stylesheet"
     />
     <style>
-      @font-face {
-        font-family: "PP Right Grotesk Mono";
-        font-weight: 400;
-        font-style: normal;
-        font-display: swap;
-        src:
-          local("PP Right Grotesk Mono"),
-          url("fonts/PPRightGroteskMono-Regular.woff2") format("woff2");
-      }
-      @font-face {
-        font-family: "PP Right Serif Mono";
-        font-weight: 400;
-        font-style: italic;
-        font-display: swap;
-        src:
-          local("PP Right Serif Mono Italic"),
-          local("PP Right Serif Mono"),
-          url("fonts/PPRightSerifMono-Italic.woff2") format("woff2");
-      }
       * {
         box-sizing: border-box;
       }
@@ -258,7 +239,7 @@
         padding: 0 0 8px;
         max-width: 680px;
         width: 100%;
-        font-family: "PP Right Grotesk Mono", "Geist Mono", ui-monospace, monospace;
+        font-family: "Geist", sans-serif;
         color: #ffffff;
         /* Shared width: instruction list, drop zone, and paste block align */
         --landing-content-max: 440px;
@@ -266,10 +247,10 @@
       }
       .landing-title {
         margin: 0 0 20px;
-        font-family: "PP Right Serif Mono", "Geist Mono", ui-serif, monospace;
+        font-family: "Hedvig Letters Serif", Georgia, serif;
         font-size: clamp(22px, 4.5vw, 30px);
         font-weight: 400;
-        font-style: italic;
+        font-style: normal;
         line-height: 1.2;
         letter-spacing: -0.02em;
         color: #ffffff;
@@ -610,7 +591,7 @@
         border-radius: 10px;
         background: rgba(10, 10, 10, 0.94);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-        font-family: "Geist Mono", monospace;
+        font-family: "Geist", sans-serif;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         --topic-swatch-size: 22px;
@@ -708,7 +689,7 @@
         border-radius: 10px;
         background: rgba(10, 10, 10, 0.94);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-        font-family: "Geist Mono", monospace;
+        font-family: "Geist", sans-serif;
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -799,7 +780,7 @@
         outline-offset: 2px;
       }
       .diet-switch-text {
-        font-family: "Geist Mono", monospace;
+        font-family: "Geist", sans-serif;
         font-size: 12px;
         line-height: 1.45;
         color: #e8e6e3;
@@ -877,7 +858,7 @@
       }
       .diet-download-btn {
         flex: 1;
-        font-family: "Geist Mono", monospace;
+        font-family: "Geist", sans-serif;
         font-size: 11px;
         letter-spacing: 0.05em;
         padding: 10px 8px;
