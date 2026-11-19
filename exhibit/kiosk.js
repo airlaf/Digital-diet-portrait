@@ -14,7 +14,7 @@
   async function api(path,options={}){const r=await fetch('/api/sessions'+path,{...options,headers:{'x-station-key':key||'',...options.headers}});const d=await r.json();if(!r.ok)throw Error(d.error);return d;}
   async function reset(){if(resetting)return;resetting=true;clearInterval(timer);try{if(session)await api('/'+session.id,{method:'DELETE'});}catch{} location.reload();}
   next.onclick=reset;
-  async function claim(){claimed=true;qr.hidden=true;link.hidden=true;next.hidden=false;setTimeout(reset,5*60_000);}
+  async function claim(){claimed=true;card.querySelector('button').disabled=true;qr.hidden=true;link.hidden=true;next.hidden=false;setTimeout(reset,5*60_000);}
   card.querySelector('button').onclick=async()=>{if(claimed)return;await claim();if(session)try{await api('/'+session.id,{method:'DELETE'});}catch{} clearInterval(timer);applyImportedWordFreq(wordFreqFromPlainText('art culture music design nature science travel books cooking garden creativity community photography architecture cinema'),'Sample portrait');status.textContent='Sample loaded. Select Start Camera below, then step into the frame.';};
   // Local uploads also retire the pairing code so a phone cannot replace a visitor.
   document.querySelector('#start-camera').addEventListener('click',async()=>{if(!claimed){await claim();if(session)try{await api('/'+session.id,{method:'DELETE'});}catch{}clearInterval(timer);}});

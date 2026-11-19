@@ -39,3 +39,40 @@ body {font-family:"Geist",sans-serif}
 .phone .phone-disclaimer,.phone small,.landing-privacy,.drop-zone-hint {
   font-family:"Geist Mono",ui-monospace,monospace;
 }
+
+/* One interaction system for kiosk, portrait downloads and phone actions.
+   Important overrides retire the older per-button hover rules in index.html. */
+body button {
+  font-family:"Geist",sans-serif !important;
+  border:1px solid #fff !important;
+  border-radius:4px !important;
+  background:#fff !important;
+  color:#111 !important;
+  box-shadow:none !important;
+  cursor:pointer;
+  transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+body button:disabled {opacity:.4 !important;cursor:not-allowed}
+body button[role="tab"][aria-selected="false"] {background:#151515 !important;color:#fff !important;border-color:#555 !important}
+@media(hover:hover) {
+  body button:not(:disabled):hover {
+    background:#d5eee8 !important;color:#111 !important;border-color:#8fd4c8 !important;
+    box-shadow:0 0 0 2px rgba(143,212,200,.28) !important;
+  }
+}
+body button:focus-visible {
+  outline:2px solid #8fd4c8 !important;outline-offset:4px !important;
+  box-shadow:none !important;
+}
+body button:not(:disabled):active {
+  background:#8fd4c8 !important;color:#111 !important;border-color:#8fd4c8 !important;
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.18) !important;
+}
+body .drop-zone:hover,body .drop-zone:focus-visible,body .drop-zone:focus-within {
+  border-color:#8fd4c8;outline:2px solid #8fd4c8;outline-offset:4px;
+}
+.phone input#file[hidden] {display:none !important}
+.phone #choose-file {width:auto;min-height:44px;font-size:14px;font-weight:500;padding:10px 16px;margin-top:4px}
+.phone #file-name {font-size:13px;line-height:1.6;color:#b8b8b8;overflow-wrap:anywhere;margin:12px 0;font-family:"Geist Mono",monospace}
+@media(prefers-reduced-motion:reduce) {body button {transition:none}}
