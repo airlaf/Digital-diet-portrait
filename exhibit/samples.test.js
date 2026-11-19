@@ -7,14 +7,19 @@ function context(){
  for(const file of ['word-filter.js','../sketch.js','data/search-sample.js','samples.js'])vm.runInContext(fs.readFileSync(new URL(file,import.meta.url),'utf8'),c);
  return c;
 }
-test('curated sample has 1,000 distinct filtered words across all eight topics',()=>{
+test('curated sample balances 600 topic words with 400 search-derived miscellaneous words',()=>{
  const c=context();const result=vm.runInContext(`buildExhibitionSample('curated')`,c);
  assert.equal(Object.keys(result.freq).length,1000);
  assert.ok(Object.values(result.freq).every(n=>n===1));
  c.freq=result.freq;
  const counts=vm.runInContext('aggregateTopicWordCounts(freq)',c);
- assert.equal(counts.other,0);
- for(const [topic,count] of Object.entries(counts))if(topic!=='other')assert.ok(count>=90,`${topic}: ${count}`);
+ assert.equal(counts.other,400);
+ const sourceWords=new Set(c.window.EXHIBIT_SEARCH_SAMPLE.words);
+ for(const word of Object.keys(result.freq)){
+  c.word=word;
+  if(vm.runInContext("topicForWord(word) === TOPIC_IDS.OTHER",c))assert.ok(sourceWords.has(word),word);
+ }
+ for(const [topic,count] of Object.entries(counts))if(topic!=='other')assert.equal(count,75,`${topic}: ${count}`);
  assert.equal(vm.runInContext('Object.keys(freq).some(w=>ExhibitWordFilter.isBlocked(w))',c),false);
 });
 test('search sample has provenance and distinct filtered words, not fabricated rank weights',()=>{
