@@ -40,9 +40,10 @@ body {font-family:"Geist",sans-serif}
   font-family:"Geist Mono",ui-monospace,monospace;
 }
 
-/* One interaction system for kiosk, portrait downloads and phone actions.
+/* Shared action-button states; browser tabs keep their original segmented styling.
+   One interaction system for kiosk, portrait downloads and phone actions.
    Important overrides retire the older per-button hover rules in index.html. */
-body button {
+body button:not(.browser-switch__btn) {
   font-family:"Geist",sans-serif !important;
   border:1px solid #fff !important;
   border-radius:4px !important;
@@ -53,19 +54,18 @@ body button {
   transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
   -webkit-tap-highlight-color:transparent;
 }
-body button:disabled {opacity:.4 !important;cursor:not-allowed}
-body button[role="tab"][aria-selected="false"] {background:#151515 !important;color:#fff !important;border-color:#555 !important}
+body button:not(.browser-switch__btn):disabled {opacity:.4 !important;cursor:not-allowed}
 @media(hover:hover) {
-  body button:not(:disabled):hover {
+  body button:not(.browser-switch__btn):not(:disabled):hover {
     background:rgba(255,255,255,.75) !important;color:#111 !important;border-color:rgba(255,255,255,.75) !important;
     box-shadow:none !important;
   }
 }
-body button:focus-visible {
+body button:not(.browser-switch__btn):focus-visible {
   outline:2px solid #fff !important;outline-offset:4px !important;
   box-shadow:none !important;
 }
-body button:not(:disabled):active {
+body button:not(.browser-switch__btn):not(:disabled):active {
   background:rgba(255,255,255,.6) !important;color:#111 !important;border-color:rgba(255,255,255,.6) !important;
   box-shadow:inset 0 2px 3px rgba(0,0,0,.18) !important;
 }
