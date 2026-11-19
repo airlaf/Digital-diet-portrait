@@ -1,0 +1,11 @@
+import {extractTitles} from './history.js';
+window.addEventListener('hashchange',()=>location.reload());
+const id=location.hash.slice(1), status=document.querySelector('#status'), file=document.querySelector('#file'), consent=document.querySelector('#consent'), send=document.querySelector('#send'), preview=document.querySelector('#preview');
+let titles=[],active=false,busy=false,selection=0;
+const update=()=>send.disabled=!active||!titles.length||!consent.checked||busy;
+async function api(path,options){const r=await fetch(`/api/sessions/${encodeURIComponent(id)}${path}`,options);const d=await r.json();if(!r.ok)throw Error(d.error);return d;}
+async function check(){try{const d=await api('');active=d.status==='waiting';file.disabled=!active;if(d.status==='ready')status.textContent='Your words are ready. Look at the exhibition screen and ask the host to start the camera.';else if(d.status==='received')status.textContent='Sent. Waiting for the exhibition computer…';else status.textContent='Connected. Choose your file to begin.';update();}catch(e){active=false;file.disabled=true;update();status.textContent=e.message;}}
+file.onchange=async()=>{const version=++selection;titles=[];consent.checked=false;update();preview.textContent='';const f=file.files[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('That file is larger than 10 MB. Export a shorter history.');const result=extractTitles(JSON.parse(await f.text()));if(version!==selection)return;titles=result;preview.textContent=`${titles.length.toLocaleString()} page titles ready. Preview: ${titles.slice(0,3).join(' · ')}`;}catch(e){preview.textContent=e instanceof SyntaxError?'That file is not valid JSON. Extract the ZIP and choose History.json.':e.message;}update();};
+consent.onchange=update;
+send.onclick=async()=>{busy=true;update();try{await api('/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titles})});titles=[];file.value='';preview.textContent='';consent.checked=false;await check();}catch(e){status.textContent=e.message;}finally{busy=false;update();}};
+if(!/^[a-f0-9]{48}$/.test(id)){status.textContent='Scan the QR code on the exhibition screen to connect.';}else{check();setInterval(()=>{if(!busy)check();},4000);}

@@ -1,0 +1,1 @@
+{"name":"digital-diet-exhibition","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node exhibit/server.js","test":"node --test exhibit/*.test.js"},"engines":{"node":">=20"},"dependencies":{"express":"5.1.0","qrcode":"1.5.4"}}

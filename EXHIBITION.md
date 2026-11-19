@@ -1,0 +1,43 @@
+# Digital Diet exhibition
+
+Separate working copy on branch `codex/exhibition-qr`. The original Desktop checkout and live GitHub Pages site are unchanged. The duplicate also preserves pre-existing uncommitted Spotify-folder changes; those are unrelated to the exhibition implementation.
+
+## Run the exhibition
+
+Requires Node.js 20 or newer.
+
+```sh
+cd "/Users/airla/Documents/ChatGPT/Digital diet exhibit/exhibition"
+npm install
+npm start
+```
+
+Open the **Exhibition station** URL printed in Terminal on the exhibition computer. It includes a private station key: do not share that URL. The key is kept in this tab's session storage and removed from the address bar. Keep the terminal running. Use localhost for camera access. Allow the camera when Start Camera is clicked.
+
+The QR code points to the computer's LAN address by default. Connect visitors to the same trusted Wi-Fi; guest-network device isolation or the macOS firewall can prevent connection. If the detected address is wrong, set PUBLIC_URL to the correct reachable address before starting.
+
+For visitors on cellular, deploy this Node server behind HTTPS or connect an HTTPS tunnel to port 3000, then start with `PUBLIC_URL=https://your-exhibition-host.example npm start` (replace with your actual address). Keep that address stable during the event. GitHub Pages cannot run this server. No cloud hosting, tunnel, GitHub push, or public deployment was performed in this change. A hosted deployment must use a single Node process/instance because sessions are held in memory; do not load-balance across instances. If hosted remotely, use the HTTPS host with the station key fragment to open the kiosk. Set STATION_KEY in the host's secret environment configuration, never in source control.
+
+## Visitor experience
+
+1. Scan the session-specific QR code.
+2. Export Safari History only, unzip in Files, and select History.json. Export availability and labels depend on iOS version. See [Apple's guide](https://support.apple.com/guide/iphone/iph1852764a6/ios) and [format documentation](https://developer.apple.com/documentation/safariservices/importing-data-exported-from-safari.md).
+3. Preview the first three titles on the phone and consent to public display. The phone extracts titles; URLs and timestamps are discarded before sending.
+4. Send. The computer imports the titles into the existing word-processing and portrait renderer. The visitor or host clicks Start Camera on the computer.
+5. Download PNG/SVG on the computer if desired. Select Next visitor to clear the portrait and create a new QR. The page automatically clears five minutes after receipt or sample selection. Local uploads clear five minutes after Start Camera.
+
+Use Try a sample portrait for visitors without an export. Existing computer upload, paste, topic colors and portrait controls remain available. Camera imagery stays in the browser. Page titles can include sensitive words; the phone explicitly asks permission before sharing them.
+
+## Retention and operating limits
+
+Titles are relayed in process memory, cleared on acknowledgment, and expire with the pairing session after at most 15 minutes. Expired allocations are swept every 30 seconds. Reset deletes the pairing and reloads the kiosk to clear its words and stop camera capture. No database or upload files are written. Restarting the server clears all sessions. Downloaded portraits are intentional local files and are not deleted by reset.
+
+A session accepts one upload; new visitors must scan a new code. The random QR token grants upload/status access only. Portrait retrieval and session control require the private station key. Raw request bodies are not logged by this application; configure any hosting proxy to avoid body logging. Use HTTPS for public operation. The local Wi-Fi prototype uses HTTP.
+
+File selection allows 10 MB JSON; the phone takes at most 10,000 nonempty titles, truncating each to 500 characters. The relay limits requests to 1 MB, so very large exports may require a smaller selection/export. An export with no usable words is rejected. Portrait word processing retains the original project's vocabulary filtering.
+
+The original renderer loads p5, Compromise, fonts and segmentation assets from the internet. This is not an offline installation. Rehearse with the actual exhibit computer, camera, iPhone and venue Wi-Fi before opening.
+
+## Verification
+
+`npm test` covers Safari title extraction, rejecting non-history exports, station authorization, QR session creation, one-upload enforcement, title retrieval, acknowledgment clearing, reset invalidation, expiration, and blocking access to Git metadata. JavaScript syntax checks also pass. Browser checks cover the welcome UI, sample loading and phone instructions. The browser file-picker automation timed out, so a full upload through the phone UI has not been verified. Physical iPhone scanning and actual camera portrait rendering still require an on-site rehearsal.
