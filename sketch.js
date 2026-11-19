@@ -924,7 +924,7 @@ function getLiveSideInsets() {
 
 function liveCanvasWidthHeight() {
   if (!live) return [Math.max(320, windowWidth), Math.max(240, windowHeight)];
-  if (!isPortraitStackedLayout()) return [Math.max(320, windowWidth), Math.max(240, windowHeight)];
+  if (!isPortraitStackedLayout()) return [Math.max(320, window.innerWidth || windowWidth), Math.max(240, window.innerHeight || windowHeight)];
   const wInner = window.innerWidth > 0 ? window.innerWidth : windowWidth;
   const wpx = Math.floor(Math.max(280, wInner));
   const innerH = window.innerHeight > 0 ? window.innerHeight : windowHeight;
@@ -947,6 +947,7 @@ function applyLiveCanvasSize() {
   pixelDensity(1);
   const wh = liveCanvasWidthHeight();
   resizeCanvas(wh[0], wh[1]);
+  lastPersonSegmentation = null;
 }
 
 /** Lets the document scroll on narrow stacked layout (`overflow` on `html` is unlocked in CSS). */
@@ -3655,8 +3656,8 @@ function letterboxRect(vw, vh, cw, ch) {
 }
 
 /**
- * Letterbox video to fit inside (cw − leftInset − rightInset) × ch, then center
- * horizontally in the full canvas (symmetric insets keep the frame visually centered).
+ * Desktop: cover the area between the panels, cropping instead of adding bars.
+ * Stacked/mobile: preserve the existing contain fit. Video and mask share this transform.
  * @param {number} leftInset
  * @param {number} rightInset
  */
@@ -3664,9 +3665,14 @@ function letterboxRectWithSideInsets(vw, vh, cw, ch, leftInset, rightInset) {
   const L = max(0, leftInset || 0);
   const R = max(0, rightInset || 0);
   const innerW = max(1, cw - L - R);
-  const { oy, dw, dh } = letterboxRect(vw, vh, innerW, ch);
-  const ox = (cw - dw) * 0.5;
-  return { ox, oy, dw, dh };
+  if (isPortraitStackedLayout()) {
+    const rect = letterboxRect(vw, vh, innerW, ch);
+    return { ...rect, ox: L + (innerW - rect.dw) * 0.5 };
+  }
+  const scale = Math.max(innerW / vw, ch / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  return { ox: L + (innerW - dw) * 0.5, oy: (ch - dh) * 0.5, dw, dh };
 }
 
 function ensureSegWorkCanvas(w, h) {
@@ -4080,10 +4086,10 @@ function buildLayout() {
   const layoutInsets = getLiveSideInsets();
   const { ox, oy, dw, dh } = letterboxRectWithSideInsets(vw, vh, width, height, layoutInsets.left, layoutInsets.right);
   const box = {
-    minX: ox + TEXT_INSET,
-    minY: oy + TEXT_INSET,
-    maxX: ox + dw - TEXT_INSET,
-    maxY: oy + dh - TEXT_INSET,
+    minX: Math.max(layoutInsets.left, ox) + TEXT_INSET,
+    minY: Math.max(0, oy) + TEXT_INSET,
+    maxX: Math.min(width - layoutInsets.right, ox + dw) - TEXT_INSET,
+    maxY: Math.min(height, oy + dh) - TEXT_INSET,
   };
   if (box.maxX - box.minX < 40 || box.maxY - box.minY < 40) return;
 
@@ -4240,6 +4246,8 @@ function setup() {
   if (dlPng) dlPng.addEventListener("click", downloadPortraitPng);
   if (dlSvg) dlSvg.addEventListener("click", downloadPortraitSvg);
   wireTileAppearanceSliders();
+  document.addEventListener("fullscreenchange", windowResized);
+  document.addEventListener("webkitfullscreenchange", windowResized);
   if (typeof window !== "undefined" && window.matchMedia) {
     const mq = window.matchMedia(`(max-width: ${PORTRAIT_STACKED_MAX_CSS_PX}px)`);
     const onStackedMq = () => {
