@@ -94,3 +94,22 @@ body .drop-zone:hover,body .drop-zone:focus-visible,body .drop-zone:focus-within
     max-width:220px;
   }
 }
+
+/* Downloads use the outlined variant of the same neutral button system. */
+body button.diet-download-btn {
+  background:transparent !important;
+  color:#fff !important;
+  border-color:rgba(255,255,255,.7) !important;
+}
+@media(hover:hover) {
+  body button.diet-download-btn:not(:disabled):hover {
+    background:rgba(255,255,255,.12) !important;
+    color:#fff !important;
+    border-color:#fff !important;
+  }
+}
+body button.diet-download-btn:not(:disabled):active {
+  background:rgba(255,255,255,.22) !important;
+  color:#fff !important;
+  border-color:#fff !important;
+}
