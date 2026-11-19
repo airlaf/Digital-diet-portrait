@@ -3520,6 +3520,40 @@ const TOPIC_RULES = [
   ]),
 ];
 
+/** Exhibition vocabulary additions: whole words, not broad substring guesses. */
+const EXHIBITION_TOPIC_WORDS = {
+  politics: "lawmaker legislation legislator ballot tariff referendum constituency constituent diplomacy geopolitical geopolitics sanction immigration democracy authoritarian activist activism protest",
+  culture: "podcast concert playlist gallery book novelist literature fiction nonfiction audiobook filmmaking filmmaker cinematography illustrator illustration designer design exhibition curator curation ceramic ceramics pottery textile textiles fashion runway couture choreography dancer festival theatre theater manga anime gaming gamer gameplay esports",
+  tech: "code coding coder developer cybersecurity headphone headphones earbud earbuds smartwatch wearable laptop smartphone chatbot prompt llm generative robotics automation debugging debugger framework compiler repository versioning deployment deploy api database encryption algorithm programmer programming software hardware",
+  health: "skincare moisturizer moisturiser workout fitness exercise nutrition dietitian dietician dermatologist dermatology sunscreen meditation mindfulness wellbeing wellness insomnia burnout recovery physiotherapy psychotherapy therapist counselling counseling supplement vitamin allergy",
+  money: "budget budgeting mortgage investment investing investor cryptocurrency crypto fintech dividend portfolio retirement pension savings saving debt repayment refinance refinancing banking bank broker brokerage stockmarket inflation checkout discount coupon ecommerce retail shopping purchase pricing",
+  science: "bacterium bacteria fossil galaxy planet astronomy astrophysics ecology ecosystem biodiversity conservation geology volcano earthquake neuroscience molecule molecular quantum telescope satellite habitat wildlife species evolution evolutionary renewable renewables emission emissions sustainability sustainable",
+  social: "friendship friend dating messaging message influencer follower selfie livestream subreddit discord reddit networking meetup community conversation relationship relationships",
+  personal: "recipe bake baking sourdough grocery groceries cook cooking cookbook kitchen restaurant cafe coffee tea breakfast lunch dinner brunch dessert pastry bread pasta noodle cuisine ingredient meal hotel flight vacation holiday travel trip hiking hike camping camp backpacking itinerary sightseeing tourism tourist destination accommodation furniture garden gardening renovation renovate decor decoration interior bedroom livingroom apartment laundry cleaning childcare parenting pet dog cat puppy kitten",
+};
+for (const rule of TOPIC_RULES) {
+  for (const word of (EXHIBITION_TOPIC_WORDS[rule.id] || "").split(/\s+/)) {
+    if (word) rule.exact.add(word);
+  }
+}
+
+/** Conservative inflection candidates; a candidate must also exist in a topic lexicon. */
+function topicWordForms(word) {
+  const forms = new Set();
+  if (word.length > 4 && word.endsWith("ies")) forms.add(word.slice(0, -3) + "y");
+  if (word.length > 4 && word.endsWith("s") && !/(ss|us|is)$/.test(word)) forms.add(word.slice(0, -1));
+  if (word.length > 5 && /(ches|shes|xes|zes|sses)$/.test(word)) forms.add(word.slice(0, -2));
+  if (word.length > 5 && word.endsWith("ied")) forms.add(word.slice(0, -3) + "y");
+  for (const suffix of ["ing", "ed"]) {
+    if (word.length < suffix.length + 3 || !word.endsWith(suffix)) continue;
+    const stem = word.slice(0, -suffix.length);
+    forms.add(stem);
+    forms.add(stem + "e");
+    if (/([b-df-hj-np-tv-z])\1$/.test(stem)) forms.add(stem.slice(0, -1));
+  }
+  return forms;
+}
+
 /** Lexicon exact hit — strong signal, no margin vs runner-up required. */
 const TOPIC_SCORE_EXACT = 100;
 /** Minimum score to assign a topic (keeps weak substring hits in OTHER). */
@@ -3535,8 +3569,9 @@ const TOPIC_WIN_MARGIN = 2;
  * @param {{ id: string, exact: Set<string>, stems: string[] }} rule
  * @returns {number}
  */
-function scoreWordAgainstRule(w, rule) {
+function scoreWordAgainstRule(w, rule, forms = topicWordForms(w)) {
   if (rule.exact.has(w)) return TOPIC_SCORE_EXACT;
+  if ([...forms].some(form => rule.exact.has(form))) return 90;
   let best = 0;
   for (let s = 0; s < rule.stems.length; s++) {
     const stem = rule.stems[s];
@@ -3554,15 +3589,26 @@ function scoreWordAgainstRule(w, rule) {
  * Pick a topic by scoring every rule and taking the winner only if it clears confidence + margin.
  * @param {string} raw
  */
+const topicWordCache = new Map();
 function topicForWord(raw) {
+  const key = String(raw || "").toLowerCase().trim();
+  if (topicWordCache.has(key)) return topicWordCache.get(key);
+  const result = classifyTopicWord(key);
+  if (topicWordCache.size >= 20000) topicWordCache.clear();
+  topicWordCache.set(key, result);
+  return result;
+}
+
+function classifyTopicWord(raw) {
   const w = String(raw || "").toLowerCase();
   if (!w) return TOPIC_IDS.OTHER;
 
   /** @type {{ id: string; sc: number }[]} */
   const scored = [];
+  const forms = topicWordForms(w);
   for (let r = 0; r < TOPIC_RULES.length; r++) {
     const rule = TOPIC_RULES[r];
-    const sc = scoreWordAgainstRule(w, rule);
+    const sc = scoreWordAgainstRule(w, rule, forms);
     if (sc > 0) scored.push({ id: rule.id, sc });
   }
   if (!scored.length) return TOPIC_IDS.OTHER;
