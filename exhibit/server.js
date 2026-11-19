@@ -49,7 +49,7 @@ export function createApp({ stationKey = randomBytes(24).toString('hex'), public
   for(const file of ['index.html','sketch.js','favicon.png']) app.get('/'+file,(req,res)=>res.sendFile(root+file));
   app.get('/',(req,res)=>res.sendFile(root+'index.html'));
   app.use('/fonts',express.static(root+'fonts'));
-  for(const file of ['kiosk.js','upload.js','history.js','word-filter.js','upload.html','exhibit.css']) app.get('/exhibit/'+file,(req,res)=>res.sendFile(root+'exhibit/'+file));
+  for(const file of ['kiosk.js','upload.js','history.js','word-filter.js','samples.js','data/search-sample.js','upload.html','exhibit.css']) app.get('/exhibit/'+file,(req,res)=>res.sendFile(root+'exhibit/'+file));
   app.use((err,req,res,next)=>res.status(err.status||500).json({error:err.type==='entity.too.large'?'Upload is too large. Try a shorter history export.':'The request could not be processed.'}));
   const cleanup=setInterval(()=>{for(const [id,s] of sessions) if(s.expires<=Date.now()) sessions.delete(id);},30000); cleanup.unref();
   return {app,stationKey,close:()=>clearInterval(cleanup)};

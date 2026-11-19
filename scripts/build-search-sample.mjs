@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+if (!process.argv[2]) throw new Error('Usage: node scripts/build-search-sample.mjs /path/to/downloaded-most-searched-keywords.json');
+const rows=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const c=vm.createContext({});
+vm.runInContext(fs.readFileSync('exhibit/word-filter.js','utf8'),c);
+vm.runInContext(fs.readFileSync('sketch.js','utf8'),c);
+const eligible=rows.filter(row=>!row.flagged&&/^[\x20-\x7E]+$/.test(row.keyword));
+c.queries=eligible.map(row=>row.keyword);
+const freq=vm.runInContext('parseHistoryJsonText(JSON.stringify(queries))',c);
+const data={title:'June 2026 Google search sample',source:'OpenRush',sourceUrl:'https://www.openrush.com/free-resources/most-searched-keywords',downloadUrl:'https://www.openrush.com/data/most-searched-keywords.json',snapshot:'2026-06',retrieved:'2026-11-19',sourceQueryCount:rows.length,eligibleQueryCount:eligible.length,method:'Source-flagged adult/piracy queries and non-ASCII queries excluded; remaining queries tokenized using the exhibition fallback tokenizer and explicit-word filter. Unique words have equal visual weight; this is not a ranking of browsing vocabulary or a full-year estimate.',words:Object.keys(freq).sort()};
+fs.writeFileSync('exhibit/data/search-sample.js','// Derived search-query vocabulary; see provenance fields below. No visitor data.\nwindow.EXHIBIT_SEARCH_SAMPLE = '+JSON.stringify(data,null,2)+';\n');
+console.log('Bundled',data.words.length,'unique words from',eligible.length,'eligible queries.');
