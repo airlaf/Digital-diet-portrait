@@ -76,3 +76,21 @@ body .drop-zone:hover,body .drop-zone:focus-visible,body .drop-zone:focus-within
 .phone #choose-file {width:auto;min-height:44px;font-size:14px;font-weight:500;padding:10px 16px;margin-top:4px}
 .phone #file-name {font-size:13px;line-height:1.6;color:#b8b8b8;overflow-wrap:anywhere;margin:12px 0;font-family:"Geist Mono",monospace}
 @media(prefers-reduced-motion:reduce) {body button {transition:none}}
+
+/* Desktop controls follow the uncropped camera's top and bottom edges. */
+@media(min-width:901px) {
+  body.portrait-mode .diet-left-column,
+  body.portrait-mode #topic-stats-panel {
+    top:var(--portrait-top,16px);
+    bottom:var(--portrait-bottom,16px);
+    background:#0a0a0a;
+    padding-top:0;
+    padding-bottom:0;
+  }
+  body.portrait-mode #topic-stats-panel {padding-bottom:52px}
+  body.portrait-mode .next-visitor {
+    bottom:var(--portrait-bottom,20px);
+    right:16px;
+    max-width:220px;
+  }
+}

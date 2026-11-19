@@ -3655,24 +3655,20 @@ function letterboxRect(vw, vh, cw, ch) {
   return { ox, oy, dw, dh };
 }
 
-/**
- * Desktop: cover the area between the panels, cropping instead of adding bars.
- * Stacked/mobile: preserve the existing contain fit. Video and mask share this transform.
- * @param {number} leftInset
- * @param {number} rightInset
- */
+/** Fit the full camera image between the side panels without cropping. */
 function letterboxRectWithSideInsets(vw, vh, cw, ch, leftInset, rightInset) {
   const L = max(0, leftInset || 0);
   const R = max(0, rightInset || 0);
   const innerW = max(1, cw - L - R);
-  if (isPortraitStackedLayout()) {
-    const rect = letterboxRect(vw, vh, innerW, ch);
-    return { ...rect, ox: L + (innerW - rect.dw) * 0.5 };
-  }
-  const scale = Math.max(innerW / vw, ch / vh);
-  const dw = vw * scale;
-  const dh = vh * scale;
-  return { ox: L + (innerW - dw) * 0.5, oy: (ch - dh) * 0.5, dw, dh };
+  const rect = letterboxRect(vw, vh, innerW, ch);
+  return { ...rect, ox: L + (innerW - rect.dw) * 0.5 };
+}
+
+/** Anchor desktop controls to the visible camera bounds, not the viewport. */
+function syncPortraitControlBounds(rect, canvasHeight) {
+  const style = document.documentElement.style;
+  style.setProperty("--portrait-top", `${Math.max(0, rect.oy)}px`);
+  style.setProperty("--portrait-bottom", `${Math.max(0, canvasHeight - rect.oy - rect.dh)}px`);
 }
 
 function ensureSegWorkCanvas(w, h) {
@@ -4085,6 +4081,7 @@ function buildLayout() {
 
   const layoutInsets = getLiveSideInsets();
   const { ox, oy, dw, dh } = letterboxRectWithSideInsets(vw, vh, width, height, layoutInsets.left, layoutInsets.right);
+  syncPortraitControlBounds({ oy, dh }, height);
   const box = {
     minX: Math.max(layoutInsets.left, ox) + TEXT_INSET,
     minY: Math.max(0, oy) + TEXT_INSET,

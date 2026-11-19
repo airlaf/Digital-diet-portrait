@@ -6,11 +6,11 @@ function layout(stacked=false){
  const c=vm.createContext({min:Math.min,max:Math.max,window:{matchMedia:()=>({matches:stacked}),innerWidth:1440,innerHeight:900},windowWidth:1200,windowHeight:700});
  vm.runInContext(fs.readFileSync(new URL('../sketch.js',import.meta.url),'utf8'),c);return c;
 }
-test('camera covers full portrait height across laptop and fullscreen ratios',()=>{
+test('camera fits between panels without cropping at laptop and fullscreen ratios',()=>{
  const c=layout();
  for(const [vw,vh,cw,ch] of [[640,480,1440,900],[1920,1080,1440,900],[1280,720,1920,1080],[640,480,1366,768],[720,1280,1440,900]]){
  const r=vm.runInContext(`letterboxRectWithSideInsets(${vw},${vh},${cw},${ch},236,236)`,c);
- assert.ok(r.oy<=0);assert.ok(r.oy+r.dh>=ch-1e-8);assert.ok(r.ox<=236);assert.ok(r.ox+r.dw>=cw-236-1e-8);
+ assert.ok(r.oy>=0);assert.ok(r.oy+r.dh<=ch+1e-8);assert.ok(r.ox>=236-1e-8);assert.ok(r.ox+r.dw<=cw-236+1e-8);
  assert.ok(Math.abs(r.dw/r.dh-vw/vh)<1e-8,'camera aspect is preserved');
  }
 });
@@ -19,4 +19,12 @@ test('mobile retains contain sizing and desktop reads current viewport dimension
  assert.equal(r.dw,390);assert.equal(r.dh,292.5);
  const desktop=layout();vm.runInContext('live=true',desktop);
  assert.deepEqual(Array.from(vm.runInContext('liveCanvasWidthHeight()',desktop)),[1440,900]);
+});
+
+test('control edges match the visible portrait rather than the viewport',()=>{
+ const c=layout();const properties={};
+ c.document={documentElement:{style:{setProperty:(name,value)=>properties[name]=value}}};
+ vm.runInContext('syncPortraitControlBounds(letterboxRectWithSideInsets(1920,1080,1440,900,236,236),900)',c);
+ assert.equal(properties['--portrait-top'],'177.75px');
+ assert.equal(properties['--portrait-bottom'],'177.75px');
 });
