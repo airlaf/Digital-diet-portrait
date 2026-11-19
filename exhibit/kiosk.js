@@ -9,7 +9,7 @@
   for(const child of [...inner.children]) if(child!==card&&!child.classList.contains('landing-actions')) local.append(child);
   inner.append(local);
   const status=card.querySelector('#exhibit-status'), qr=card.querySelector('img'), link=card.querySelector('a');
-  const next=document.createElement('button');next.textContent='Next visitor · clear portrait';next.className='next-visitor';next.hidden=true;document.body.append(next);
+  const next=document.createElement('button');next.textContent='Next visitor · exit portrait';next.className='next-visitor';next.hidden=true;document.body.append(next);
   let session=null,timer=null,resetting=false,claimed=false;
   async function api(path,options={}){const r=await fetch('/api/sessions'+path,{...options,headers:{'x-station-key':key||'',...options.headers}});const d=await r.json();if(!r.ok)throw Error(d.error);return d;}
   async function reset(){if(resetting)return;resetting=true;clearInterval(timer);try{if(session)await api('/'+session.id,{method:'DELETE'});}catch{} location.reload();}
