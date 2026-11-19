@@ -856,7 +856,7 @@ const TOPIC_IDS = {
 
 /** Default RGB fills (editable copy lives in `topicRgbById`). */
 const TOPIC_RGB = {
-  [TOPIC_IDS.POLITICS]: [76, 126, 184],
+  [TOPIC_IDS.POLITICS]: [35, 73, 139],
   [TOPIC_IDS.CULTURE]: [240, 126, 92],
   [TOPIC_IDS.TECH]: [0, 174, 194],
   [TOPIC_IDS.HEALTH]: [112, 168, 132],
