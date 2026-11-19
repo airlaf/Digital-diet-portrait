@@ -3905,7 +3905,7 @@ function maybeRequestSegmentation() {
 function applyGeistWeight(gfx, weight, sizePx) {
   gfx.textFont(textFont());
   gfx.textSize(sizePx);
-  gfx.drawingContext.font = `${weight} ${sizePx}px "Geist", sans-serif`;
+  gfx.drawingContext.font = `${weight} ${sizePx}px "Geist Mono", monospace`;
 }
 
 /** Called from draw() so shuffles stay on p5's redraw loop (more reliable than setInterval). */
@@ -4172,7 +4172,7 @@ function startLive() {
 
   applyLiveCanvasSize();
   syncPortraitDocumentScrollClass();
-  textFont("sans-serif");
+  textFont("monospace");
   textAlign(LEFT, BASELINE);
   updateTopicStatsPanel();
   if (continuousShuffleOn) lastContinuousShuffleAtMs = millis();
@@ -4213,12 +4213,12 @@ function startLive() {
       if (document.fonts && document.fonts.load) {
         const px = `${tileFontSizePx}px`;
         for (const w of [400, 500, 600, 700]) {
-          await document.fonts.load(`${w} ${px} "Geist"`);
+          await document.fonts.load(`${w} ${px} "Geist Mono"`);
         }
       }
-      textFont("Geist");
+      textFont("Geist Mono");
     } catch (e) {
-      textFont("sans-serif");
+      textFont("monospace");
     }
     applyLiveCanvasSize();
     buildLayout();
