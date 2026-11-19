@@ -1,4 +1,5 @@
 import express from 'express';
+import './word-filter.js';
 import QRCode from 'qrcode';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
@@ -38,7 +39,9 @@ export function createApp({ stationKey = randomBytes(24).toString('hex'), public
     const s=req.session, titles=req.body.titles;
     if(s.status !== 'waiting') return res.status(409).json({error:'This screen already has a visitor. Please scan the next QR code.'});
     if(!Array.isArray(titles) || !titles.length || titles.length>10000 || titles.some(t=>typeof t!=='string'||!t.trim()||t.length>500)) return res.status(400).json({error:'Choose a history file with readable page titles (up to 10,000).'});
-    s.titles=titles; s.status='received'; res.json({status:s.status});
+    const filtered=titles.map(t=>ExhibitWordFilter.sanitizeText(t).trim()).filter(Boolean);
+    if(!filtered.length) return res.status(400).json({error:'No usable titles remain after filtering. Try another export or the sample portrait.'});
+    s.titles=filtered; s.status='received'; res.json({status:s.status});
   });
   app.get('/api/sessions/:id/portrait', station, session, (req,res)=>res.json({status:req.session.status,titles:req.session.titles}));
   app.post('/api/sessions/:id/ack', station, session, (req,res)=>{req.session.titles=null; req.session.status='ready';res.json({ok:true});});
@@ -46,7 +49,7 @@ export function createApp({ stationKey = randomBytes(24).toString('hex'), public
   for(const file of ['index.html','sketch.js','favicon.png']) app.get('/'+file,(req,res)=>res.sendFile(root+file));
   app.get('/',(req,res)=>res.sendFile(root+'index.html'));
   app.use('/fonts',express.static(root+'fonts'));
-  for(const file of ['kiosk.js','upload.js','history.js','upload.html','exhibit.css']) app.get('/exhibit/'+file,(req,res)=>res.sendFile(root+'exhibit/'+file));
+  for(const file of ['kiosk.js','upload.js','history.js','word-filter.js','upload.html','exhibit.css']) app.get('/exhibit/'+file,(req,res)=>res.sendFile(root+'exhibit/'+file));
   app.use((err,req,res,next)=>res.status(err.status||500).json({error:err.type==='entity.too.large'?'Upload is too large. Try a shorter history export.':'The request could not be processed.'}));
   const cleanup=setInterval(()=>{for(const [id,s] of sessions) if(s.expires<=Date.now()) sessions.delete(id);},30000); cleanup.unref();
   return {app,stationKey,close:()=>clearInterval(cleanup)};
@@ -56,7 +59,8 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
   const ip=Object.values(networkInterfaces()).flat().find(n=>n.family==='IPv4'&&!n.internal)?.address||'localhost';
   const publicUrl=(process.env.PUBLIC_URL||`http://${ip}:${port}`).replace(/\/$/,'');
   const {app,stationKey}=createApp({publicUrl,stationKey:process.env.STATION_KEY});
-  app.listen(port,'0.0.0.0',()=>{
+  app.listen(port,'0.0.0.0',(error)=>{
+    if(error){console.error(`Could not start exhibition server: ${error.message}`);process.exitCode=1;return;}
     console.log(`Exhibition station: http://localhost:${port}/#station=${stationKey}`);
     console.log(`Phone connection: ${publicUrl} ${process.env.PUBLIC_URL?'':'(same Wi-Fi required)'}`);
   });

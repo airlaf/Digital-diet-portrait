@@ -2,7 +2,7 @@
   const key=new URLSearchParams(location.hash.slice(1)).get('station')||sessionStorage.getItem('exhibit-station');
   if(key){sessionStorage.setItem('exhibit-station',key);history.replaceState(null,'',location.pathname);}
   const card=document.createElement('section');card.className='exhibit-card';
-  card.innerHTML='<span class="exhibit-label">Exhibition edition</span><h2>You are what you scroll.</h2><div class="exhibit-pair"><img id="exhibit-qr" alt="Scan to send history from your phone" hidden><div><p>Scan with your phone. Choose your Safari history. See its words become your portrait.</p><a id="exhibit-link" target="_blank" rel="noreferrer"></a></div></div><p id="exhibit-status" role="status">Connecting…</p><button id="exhibit-sample">Try a sample portrait</button>';
+  card.innerHTML='<span class="exhibit-label">Exhibition edition</span><h2>You are what you scroll.</h2><div class="exhibit-pair"><img id="exhibit-qr" alt="Scan to send history from your phone" hidden><div><p>Scan with your phone. Choose your Safari history. See its words become your portrait. Common explicit words are filtered before display.</p><a id="exhibit-link" target="_blank" rel="noreferrer"></a></div></div><p id="exhibit-status" role="status">Connecting…</p><button id="exhibit-sample">Try a sample portrait</button>';
   document.querySelector('.landing-inner').prepend(card);
   const local=document.createElement('details');local.className='exhibit-local';local.innerHTML='<summary>Or upload a file on this computer</summary>';
   const inner=document.querySelector('.landing-inner');

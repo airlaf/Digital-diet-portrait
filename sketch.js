@@ -381,6 +381,7 @@ function rareLetterBurden(w) {
  * @param {string} w lowercased a–z only
  */
 function isAcceptableWordToken(w) {
+  if (!globalThis.ExhibitWordFilter || ExhibitWordFilter.isBlocked(w)) return false;
   if (!w || w.length < 3 || w.length > 20) return false;
   if (!/^[a-z]+$/.test(w)) return false;
   if (NOISE_WORDS.has(w)) return false;
@@ -475,7 +476,7 @@ function updateStartCameraEnabled() {
 
 function tokenizeWords(text) {
   const out = [];
-  const s = String(text || "").toLowerCase();
+  const s = globalThis.ExhibitWordFilter ? ExhibitWordFilter.sanitizeText(text).toLowerCase() : "";
   const re = /[a-z]{3,}/g;
   let m;
   while ((m = re.exec(s))) {
@@ -496,7 +497,7 @@ const COMPROMISE_TEXT_MAX_CHARS = 400000;
  * @returns {string[]}
  */
 function meaningfulTokensFromText(text) {
-  const raw = String(text || "");
+  const raw = globalThis.ExhibitWordFilter ? ExhibitWordFilter.sanitizeText(text) : "";
   if (typeof nlp !== "function") {
     return tokenizeWords(raw);
   }
@@ -671,6 +672,7 @@ function parseHistoryJsonText(text) {
 }
 
 function applyImportedWordFreq(freq, label) {
+  freq = Object.fromEntries(Object.entries(freq || {}).filter(([word]) => globalThis.ExhibitWordFilter && !ExhibitWordFilter.isBlocked(word)));
   if (!freq || !Object.keys(freq).length) {
     setHistoryStatus("No words found in that file. Try JSON from the extension or a different export.", "err");
     return false;

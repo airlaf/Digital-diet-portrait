@@ -41,3 +41,9 @@ The original renderer loads p5, Compromise, fonts and segmentation assets from t
 ## Verification
 
 `npm test` covers Safari title extraction, rejecting non-history exports, station authorization, QR session creation, one-upload enforcement, title retrieval, acknowledgment clearing, reset invalidation, expiration, and blocking access to Git metadata. JavaScript syntax checks also pass. Browser checks cover the welcome UI, sample loading and phone instructions. The browser file-picker automation timed out, so a full upload through the phone UI has not been verified. Physical iPhone scanning and actual camera portrait rendering still require an on-site rehearsal.
+
+## Public-display word filter
+
+`exhibit/word-filter.js` is the shared editable list and matching logic. It removes common English profanity, explicit sexual vocabulary and adult-site names; normalization handles case, accents, full-width characters, common leetspeak and punctuation-separated variants. The phone filters before preview/transmission, the relay filters incoming titles again, and the portrait filters both before NLP and before accepting word frequencies. JSON, CSV and pasted text follow the same portrait rules. Empty filtered phone uploads are rejected without consuming the session. If the filter fails to load, portrait word ingestion fails closed.
+
+This is a conservative vocabulary filter, not a guarantee against every explicit term, other languages, deliberate evasion or sensitive personal information. Some ambiguous terms are intentionally removed for the public setting. Ordinary words such as analysis, class and assignment are retained. Add exhibition-specific terms to the shared list and run `npm test`. Refresh already-open kiosk and phone pages after an update; existing portraits are not retroactively sanitized until reloaded.
